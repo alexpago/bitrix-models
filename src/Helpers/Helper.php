@@ -8,7 +8,7 @@ use Bitrix\Main\Loader;
 /**
  * Вспомогательные статические методы
  */
-final readonly class Helper
+final class Helper
 {
     /**
      * camelSpace to snake_case

@@ -6,7 +6,7 @@
 
 ## Установка
 
-1. ```composer require pago/bitrix-models```
+1. ```ccomposer require alexpago/bitrix-models dev-main```
 2. Устанавливаем модуль
 3. Для удобства создания моделей создаем бинарный файл по пути bin/model. Содержимое файла:
 
@@ -16,7 +16,7 @@
 declare(strict_types=1);
 $_SERVER['DOCUMENT_ROOT'] = str_replace('/bin', '', getenv('PWD'));
 
-require_once $_SERVER['DOCUMENT_ROOT'] . '/vendor/pago/bitrix-models/src/Console/bin/generate';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/vendor/alexpago/bitrix-models/src/Console/bin/generate';
 ```
 
 ## Создание моделей в автоматическом режиме
