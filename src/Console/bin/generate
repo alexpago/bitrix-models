@@ -1,0 +1,23 @@
+#!/usr/bin/env php
+<?php
+declare(strict_types=1);
+
+if (php_sapi_name() != 'cli') {
+    die('Запуск только через cli');
+}
+
+if (empty($_SERVER['DOCUMENT_ROOT'])) {
+    $_SERVER['DOCUMENT_ROOT'] = explode('/vendor/', getenv('PWD'))[0];
+}
+
+const NO_KEEP_STATISTIC = true;
+const NOT_CHECK_PERMISSIONS = true;
+const BX_NO_ACCELERATOR_RESET = true;
+const CHK_EVENT = true;
+$_SERVER['SERVER_NAME'] = 'cli';
+
+require_once $_SERVER['DOCUMENT_ROOT'] . '/vendor/autoload.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_before.php';
+
+$service = new \Pago\Bitrix\Models\Console\Generate\GenerateModelService($argv);
+return;

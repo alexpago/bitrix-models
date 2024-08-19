@@ -1,0 +1,17 @@
+<?php
+
+namespace #NAMESPACE#;
+
+use Pago\Bitrix\Models\IModel;
+use Bitrix\Iblock\ORM\ValueStorage;
+use Bitrix\Main\ORM\Objectify\Collection;
+
+/**
+ * Для вызова методов getProperty и получения значения используйте метод getValue()
+#PROPERTIES#
+#METHODS#
+ */
+class #NAME# extends IModel
+{
+
+}

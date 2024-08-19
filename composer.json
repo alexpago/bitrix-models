@@ -1,0 +1,23 @@
+{
+  "name": "pago/bitrix-models",
+  "description": "Bitrix модели",
+  "type": "bitrix-module",
+  "keywords": [
+    "bitrix",
+    "module"
+  ],
+  "authors": [
+    {
+      "name": "Alex Pago",
+      "email": "alexeypago@gmail.com",
+      "role": "Author"
+    }
+  ],
+  "license": "MIT",
+  "require": {
+    "php": ">=8.0",
+    "composer/installers": "~1",
+    "ext-json": "*",
+    "ext-iconv": "*"
+  }
+}

@@ -1,0 +1,15 @@
+<?php
+
+namespace #NAMESPACE#;
+
+use Pago\Bitrix\Models\HlModel;
+use Bitrix\Main\Type\DateTime;
+
+/**
+ * HighloadBlock - #NAME#
+#PROPERTIES#
+ */
+class #NAME# extends HlModel
+{
+
+}
