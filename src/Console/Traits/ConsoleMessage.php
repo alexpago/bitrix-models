@@ -1,7 +1,11 @@
 <?php
+declare(strict_types=1);
 
 namespace Pago\Bitrix\Models\Console\Traits;
 
+/**
+ * Форматирование и вывод сообщенийв консоль
+ */
 trait ConsoleMessage
 {
     /**

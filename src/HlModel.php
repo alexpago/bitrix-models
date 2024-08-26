@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 namespace Pago\Bitrix\Models;
 
@@ -8,6 +9,7 @@ use Bitrix\Iblock\ORM\ElementV1;
 use Bitrix\Iblock\ORM\ElementV2;
 use Bitrix\Main\ORM\Data\Result;
 use Bitrix\Main\ORM\Objectify\EntityObject;
+use Bitrix\Main\ORM\Query\Result as QueryResult;
 use Bitrix\Main\SystemException;
 use Pago\Bitrix\Models\Data\ElementResult;
 use Pago\Bitrix\Models\Helpers\Helper;
@@ -63,20 +65,31 @@ abstract class HlModel extends BaseModel
      * @return int
      * @throws SystemException
      */
-    public static function hlId(): int
+    final public static function hlId(): int
     {
         if (null !== static::HL_ID) {
             return (int)static::HL_ID;
         }
         // По символьному коду
         if (static::HL_CODE) {
-            return HlModelHelper::getHlIdByCode(static::HL_CODE);
+            return HlModelHelper::getHlIdByCode((string)static::HL_CODE);
         }
 
         $class = explode('\\', static::class);
         $class = end($class);
 
         return HlModelHelper::getHlIdByCode($class);
+    }
+
+    /**
+     * Фасет GetList
+     * @param array $parameters
+     * @return QueryResult
+     * @see DataManager::getList()
+     */
+    final public static function getList(array $parameters = []): QueryResult
+    {
+        return HlModelQuery::instance(static::class)->getList($parameters);
     }
 
     /**
@@ -148,6 +161,8 @@ abstract class HlModel extends BaseModel
 
     /**
      * Результат запроса
+     * @param int|null $limit
+     * @param int|null $offset
      * @return array<static>
      */
     public function get(?int $limit = null, ?int $offset = null): array
@@ -159,13 +174,26 @@ abstract class HlModel extends BaseModel
             $this->setOffset($offset);
         }
 
-        return (new HlModelQuery(static::class))->fetch(
+        return HlModelQuery::instance(static::class)->fetch(
             filter: $this->queryFilter,
             select: $this->querySelect,
             order: $this->queryOrder,
             limit: $this->queryLimit,
             offset: $this->queryOffset
         );
+    }
+
+    /**
+     * Количество элементов в БД
+     * @return int
+     */
+    public function count(): int
+    {
+        if (! $this->queryIsInit) {
+            return 0;
+        }
+
+        return HlModelQuery::instance(static::class)->count($this->queryFilter);
     }
 
     /**
@@ -197,19 +225,15 @@ abstract class HlModel extends BaseModel
 
         foreach ($elements as $element) {
             /**
-             * @var ElementV1|ElementV2 $element
+             * @var EntityObject $element
+             * @var Result $delete
              */
-            if (method_exists($element, 'delete')) {
-                /**
-                 * @var Result $delete
-                 */
-                $delete = $element->delete();
-                $result[] = new ElementResult(
-                    elementId: $delete->isSuccess(),
-                    success: (int)$element->getId(),
-                    error: $delete->getErrorMessages()
-                );
-            }
+            $delete = $element->delete();
+            $result[] = new ElementResult(
+                elementId: (int)$element->getId(),
+                success: $delete->isSuccess(),
+                error: $delete->getErrorMessages()
+            );
         }
 
         return $result;

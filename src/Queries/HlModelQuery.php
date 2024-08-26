@@ -5,6 +5,7 @@ namespace Pago\Bitrix\Models\Queries;
 
 use Bitrix\Highloadblock\DataManager;
 use Bitrix\Main\ORM\Objectify\EntityObject;
+use Bitrix\Main\ORM\Query\Result as QueryResult;
 use Bitrix\Main\SystemException;
 use Pago\Bitrix\Models\Helpers\Helper;
 use Pago\Bitrix\Models\HlModel;
@@ -21,11 +22,6 @@ final class HlModelQuery
     private string $model;
 
     /**
-     * @var array|string[]
-     */
-    private array $defaultSelect = ['*'];
-
-    /**
      * @param string $model Класс модели
      */
     public function __construct(string $model)
@@ -35,11 +31,20 @@ final class HlModelQuery
     }
 
     /**
-     * @param  array  $filter
-     * @param  array  $select
-     * @param  array  $order
-     * @param  int  $limit
-     * @param  int  $offset
+     * @param string $model Класс модели
+     * @return self
+     */
+    public static function instance(string $model): self
+    {
+        return new self($model);
+    }
+
+    /**
+     * @param array $filter
+     * @param array $select
+     * @param array $order
+     * @param int $limit
+     * @param int $offset
      * @return array
      */
     public function fetch(
@@ -54,20 +59,8 @@ final class HlModelQuery
          */
         $model = new $this->model();
         $data = [];
-        $entity = $model::getEntityClass();
-        if (null === $entity) {
-            throw new SystemException(
-                sprintf(
-                    'Ошибка инициализации highload ID = %d',
-                    $model::hlId()
-                )
-            );
-        }
-        /**
-         * @var DataManager $entity
-         */
-        $entity = new $entity();
-        $query = $entity->getList([
+        $entity = $this->getEntityClass($model);
+        $query = $entity::getList([
             'filter' => $filter,
             'select' => $select,
             'order'  => $order,
@@ -84,5 +77,57 @@ final class HlModelQuery
         }
 
         return $data;
+    }
+
+    /**
+     * Фасет GetList
+     * @param array $parameters
+     * @return QueryResult
+     * @see DataManager::getList()
+     */
+    public function getList(array $parameters = []): QueryResult
+    {
+        $entity = $this->getEntityClass();
+
+        return $entity::getList($parameters);
+    }
+
+    /**
+     * Фасет GetCount
+     * @param array $filter
+     * @return int
+     * @see DataManager::getCount()
+     */
+    public function count(array $filter = []): int {
+        $entity = $this->getEntityClass();
+
+        return $entity::getCount($filter);
+    }
+
+    /**
+     * Получение экземпляра класса @see DataManager
+     * @param HlModel|null $model
+     * @return DataManager
+     * @throws SystemException
+     */
+    private function getEntityClass(?HlModel $model = null): DataManager
+    {
+        if (null === $model) {
+            $model = new $this->model();
+        }
+        /**
+         * @var HlModel $model
+         */
+        $entity = $model::getEntityClass();
+        if (null === $entity) {
+            throw new SystemException(
+                sprintf(
+                    'Ошибка инициализации highload ID = %d',
+                    $model::hlId()
+                )
+            );
+        }
+
+        return new $entity();
     }
 }

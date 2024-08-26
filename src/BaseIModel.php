@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 namespace Pago\Bitrix\Models;
 
@@ -9,6 +10,7 @@ use Bitrix\Iblock\ORM\ValueStorage;
 use Bitrix\Main\ArgumentException;
 use Bitrix\Main\ORM\Data\Result;
 use Bitrix\Main\ORM\Objectify\Collection;
+use Bitrix\Main\ORM\Query\Result as QueryResult;
 use Bitrix\Main\SystemException;
 use Pago\Bitrix\Models\Data\ElementResult;
 use Pago\Bitrix\Models\Helpers\Helper;
@@ -24,9 +26,20 @@ abstract class BaseIModel extends BaseModel
     public const IBLOCK_ID = null;
 
     /**
+     * Ссылка на детальную страницу
+     * @var string|null
+     */
+    public ?string $detailPageUrl = null;
+
+    /**
      * @var bool
      */
     private bool $withProperties = false;
+
+    /**
+     * @var bool
+     */
+    private bool $withDetailPageUrl = false;
 
     /**
      * @var ElementV2|ElementV1|null
@@ -57,10 +70,21 @@ abstract class BaseIModel extends BaseModel
         }
         // По символьному коду
         if (static::IBLOCK_CODE) {
-            return IModelHelper::getIblockIdByCode(static::IBLOCK_CODE);
+            return IModelHelper::getIblockIdByCode((string)static::IBLOCK_CODE);
         }
 
         return IModelHelper::getIblockIdByCode(Helper::camelToSnakeCase($class));
+    }
+
+    /**
+     * Фасет GetList
+     * @param array $parameters
+     * @return QueryResult
+     * @see CommonElementTable::getList()
+     */
+    final public static function getList(array $parameters = []): QueryResult
+    {
+        return IModelQuery::instance(static::class)->getList($parameters);
     }
 
     /**
@@ -68,7 +92,7 @@ abstract class BaseIModel extends BaseModel
      * @param string $parameter
      * @return mixed
      */
-    public function __get(string $parameter): mixed
+    final public function __get(string $parameter): mixed
     {
         if (null === $this->element()) {
             return null;
@@ -86,7 +110,7 @@ abstract class BaseIModel extends BaseModel
      * @see ElementV2
      * @see ElementV1
      */
-    public function __call(string $name, array $arguments)
+    final public function __call(string $name, array $arguments)
     {
         // Поиск getFieldName из объекта $this->element()
         if ($this->element() && preg_match('/get([a-z])/i', $name)) {
@@ -185,6 +209,8 @@ abstract class BaseIModel extends BaseModel
 
     /**
      * Результат запроса
+     * @param int|null $limit
+     * @param int|null $offset
      * @return array<static>
      */
     public function get(?int $limit = null, ?int $offset = null): array
@@ -196,15 +222,29 @@ abstract class BaseIModel extends BaseModel
             $this->setOffset($offset);
         }
 
-        return (new IModelQuery(static::class))->fetch(
+        return IModelQuery::instance(static::class)->fetch(
             filter: $this->queryFilter,
             select: $this->querySelect,
             order: $this->queryOrder,
             limit: $this->queryLimit,
             offset: $this->queryOffset,
             includeProperties: $this->withProperties,
+            withDetailPageUrl: $this->withDetailPageUrl,
             cacheTtl: $this->cacheTtl
         );
+    }
+
+    /**
+     * Количество элементов в БД
+     * @return int
+     */
+    public function count(): int
+    {
+        if (! $this->queryIsInit) {
+            return 0;
+        }
+
+        return IModelQuery::instance(static::class)->count($this->queryFilter);
     }
 
     /**
@@ -237,15 +277,13 @@ abstract class BaseIModel extends BaseModel
         foreach ($elements as $element) {
             /**
              * @var ElementV1|ElementV2 $element
+             * @var Result $delete
              */
             if (method_exists($element, 'delete')) {
-                /**
-                 * @var Result $delete
-                 */
                 $delete = $element->delete();
                 $result[] = new ElementResult(
-                    elementId: $delete->isSuccess(),
-                    success: (int)$element->getId(),
+                    elementId: (int)$element->getId(),
+                    success: $delete->isSuccess(),
                     error: $delete->getErrorMessages()
                 );
             }
@@ -282,11 +320,40 @@ abstract class BaseIModel extends BaseModel
     }
 
     /**
+     * @return string|null
+     */
+    public function getDetailPageUrl(): ?string
+    {
+        $element = $this->element();
+        if (! method_exists($element, 'getId')) {
+            return null;
+        }
+        if (null === $this->detailPageUrl) {
+            $elementId = (int)$element->getId();
+            $this->detailPageUrl = IModelQuery::instance(static::class)
+                ->getDetailPageUrl($elementId)[$elementId];
+        }
+
+        return $this->detailPageUrl;
+    }
+
+    /**
      * @return $this
      */
     public function withProperties(): self
     {
         $this->withProperties = true;
+
+        return $this;
+    }
+
+    /**
+     * Получить элементы с начальной загрузкой детальной страницы
+     * @return $this
+     */
+    public function withDetailPageUrl(): self
+    {
+        $this->withDetailPageUrl = true;
 
         return $this;
     }

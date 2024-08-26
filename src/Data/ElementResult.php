@@ -29,7 +29,7 @@ class ElementResult
     /**
      * @param int $elementId
      * @param bool $success
-     * @param string|null $error
+     * @param string|array|null $error
      */
     public function __construct(int $elementId, bool $success = true, string|array|null $error = null)
     {

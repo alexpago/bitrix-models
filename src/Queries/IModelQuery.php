@@ -3,10 +3,14 @@ declare(strict_types=1);
 
 namespace Pago\Bitrix\Models\Queries;
 
+use Bitrix\Iblock\ORM\CommonElementTable;
 use Bitrix\Iblock\Iblock;
 use Bitrix\Iblock\ORM\ElementV1;
 use Bitrix\Iblock\ORM\ElementV2;
+use Bitrix\Main\ORM\Objectify\EntityObject;
+use Bitrix\Main\ORM\Query\Result as QueryResult;
 use Bitrix\Main\SystemException;
+use CIBlockElement;
 use Pago\Bitrix\Models\Helpers\IModelHelper;
 use Pago\Bitrix\Models\IModel;
 
@@ -36,6 +40,15 @@ final class IModelQuery
     }
 
     /**
+     * @param string $model Класс модели
+     * @return self
+     */
+    public static function instance(string $model): self
+    {
+        return new self($model);
+    }
+
+    /**
      * Получение элементов запроса
      * @param array $filter
      * @param array $select
@@ -53,6 +66,7 @@ final class IModelQuery
         int $limit = 999_999_999_999,
         int $offset = 0,
         bool $includeProperties = false,
+        bool $withDetailPageUrl = false,
         int $cacheTtl = 0
     ): array {
         /**
@@ -60,24 +74,19 @@ final class IModelQuery
          */
         $model = new $this->model();
         $data = [];
-        $iblockId = $model::iblockId();
-        /** @var string|null $iblockEntity */
-        $entity = Iblock::wakeUp($iblockId)->getEntityDataClass();
-        if (null === $entity) {
-            throw new SystemException(
-                sprintf(
-                    'Ошибка инициализации инфоблока ID = %d. Заполните API_CODE инфоблока',
-                    $iblockId
-                )
-            );
-        }
         $cache = [];
         if ($cacheTtl) {
             $cache['cache'] = [
                 'ttl' => $cacheTtl
             ];
         }
-        $query = (new $entity())->getList(
+        /**
+         * @var array<ElementV1|ElementV2> $elements
+         * @var array<int> $elementIds
+         */
+        $elements = [];
+        $elementIds = [];
+        $query = $this->getEntityClass($model)::getList(
             array_merge(
                 [
                     'filter' => $filter,
@@ -95,11 +104,82 @@ final class IModelQuery
         );
         foreach ($query->fetchCollection() as $element) {
             /**
-             * @var ElementV2|ElementV1 $element
+             * @var EntityObject $element
+             */
+            $elements[] = $element;
+            $elementIds[] = $element->getId();
+        }
+
+        // Загрузка детальных ссылок элементов
+        $detailPageUrls = [];
+        if ($withDetailPageUrl) {
+            $detailPageUrls = $this->getDetailPageUrl($elementIds);
+        }
+
+        foreach ($elements as $element) {
+            /**
+             * @var ElementV1|ElementV2 $element
              * @var IModel $model
              */
             $model = clone $model;
+            if ($withDetailPageUrl) {
+                $model->detailPageUrl = $detailPageUrls[(int)$element->getId()];
+            }
             $data[] = $model->setElement($element);
+        }
+
+        return $data;
+    }
+
+    /**
+     * Фасет GetList
+     * @param array $parameters
+     * @return QueryResult
+     * @see CommonElementTable::getList()
+     */
+    public function getList(array $parameters = []): QueryResult
+    {
+        $entity = $this->getEntityClass();
+
+        return $entity::getList($parameters);
+    }
+
+    /**
+     * Фасет GetCount
+     * @param array $filter
+     * @return int
+     * @see CommonElementTable::getCount()
+     */
+    public function count(array $filter = []): int {
+        $entity = $this->getEntityClass();
+
+        return $entity::getCount($filter);
+    }
+
+    /**
+     * Получение детальной страницы URL
+     * @param int|array $elementId
+     * @return array<string>
+     */
+    public function getDetailPageUrl(int|array $elementId): array
+    {
+        $data = [];
+        /**
+         * @var IModel $model
+         */
+        $model = new $this->model();
+        $elements = CIBlockElement::getList(
+            arFilter: [
+                '=ID' => $elementId,
+                '=IBLOCK_ID' => $model::iblockId()
+            ],
+            arSelectFields: [
+                'ID',
+                'DETAIL_PAGE_URL'
+            ]
+        );
+        while ($element = $elements->GetNext()) {
+            $data[(int)$element['ID']] = $element['DETAIL_PAGE_URL'];
         }
 
         return $data;
@@ -125,5 +205,32 @@ final class IModelQuery
         }
 
         return array_unique($select);
+    }
+
+    /**
+     * Получение экземпляра класса
+     * @param IModel|null $model
+     * @return CommonElementTable
+     */
+    private function getEntityClass(?IModel $model = null): CommonElementTable
+    {
+        if (null === $model) {
+            $model = new $this->model();
+        }
+        /**
+         * @var IModel $model
+         */
+        $iblockId = $model::iblockId();
+        $entity = Iblock::wakeUp($iblockId)->getEntityDataClass();
+        if (null === $entity) {
+            throw new SystemException(
+                sprintf(
+                    'Ошибка инициализации инфоблока ID = %d. Заполните API_CODE инфоблока',
+                    $iblockId
+                )
+            );
+        }
+
+        return new $entity();
     }
 }

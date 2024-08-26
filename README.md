@@ -6,7 +6,7 @@
 
 ## Установка
 
-1. ```ccomposer require alexpago/bitrix-models dev-main```
+1. ```composer require alexpago/bitrix-models dev-main```
 2. Устанавливаем модуль
 3. Для удобства создания моделей создаем бинарный файл по пути bin/model. Содержимое файла:
 
@@ -188,6 +188,23 @@ CertificatesServices::query()->withProperties()->select('ID')->select('CODE', 'N
 ```
 
 > **Внимание:** не рекомендуется выгружать все свойства без строгой необходимости
+> **Внимание:** `DETAIL_PAGE_URL` не принадлежит элементам. Для получения используйте метод `getDetailPageUrl()`. 
+> Если необходимо заранее получить список детальных страниц, перед get рекомендуем использовать `withDetailPageUrl()`
+
+Пример с получением `detail page url`:
+```php
+// SALONS и CITY - свойства инфоблока. Обратите внимание, префикс PROPERTY указывать не нужно
+$element = CertificatesServices::query()->withDetailPageUrl()->select('ID')->first();
+$element->getDetailPageUrl();
+```
+
+### Количество элементов
+
+Пример получения количества элементов:
+```php
+// SALONS и CITY - свойства инфоблока. Обратите внимание, префикс PROPERTY указывать не нужно
+CertificatesServices::query()->where('ID', '>=', 1)->count();
+```
 
 ### Сортировка
 
