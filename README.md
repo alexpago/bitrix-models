@@ -44,7 +44,9 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/vendor/alexpago/bitrix-models/src/Con
 
 namespace Pago\Bitrix\Models\Models\Catalog;
 
-use Bitrix\Iblock\ORM\ValueStorage;use Bitrix\Main\ORM\Objectify\Collection;use Pago\Bitrix\Models\IModel;
+use Bitrix\Iblock\ORM\ValueStorage;
+use Bitrix\Main\ORM\Objectify\Collection;
+use Pago\Bitrix\Models\IModel;
 
 /**
  * Для вызова методов getProperty и получения значения используйте метод getValue()

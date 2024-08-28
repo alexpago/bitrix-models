@@ -7,7 +7,10 @@ use Bitrix\Main\Type\DateTime;
 
 /**
  * HighloadBlock - #NAME#
+ * @property int ID
 #PROPERTIES#
+ * @method $this whereId(mixed $data, string $operator = '') // ID
+#METHODS#
  */
 class #NAME# extends HlModel
 {

@@ -20,6 +20,11 @@ class HlBlock extends Base
     private string $layoutProperty = '@property %s %s // %s';
 
     /**
+     * @var string
+     */
+    private string $layoutMethod = '@method %s where%s(mixed $data, string $operator = \'\') // %s';
+
+    /**
      * @param int $id
      */
     public function __construct(int $id)
@@ -43,10 +48,11 @@ class HlBlock extends Base
         $model = str_replace('#NAME#', $data->name, $model);
 
         // Генерация документации
-        $properties = '';
+        $properties = ''; $methods = '';
         foreach (HlModelHelper::getProperties($this->id) as $property) {
             if ('' !== $properties) {
                 $properties .= PHP_EOL;
+                $methods .= PHP_EOL;
             }
             $properties .= ' * ' . sprintf(
                     $this->layoutProperty,
@@ -54,9 +60,17 @@ class HlBlock extends Base
                     $property['CODE'],
                     ucfirst($property['NAME'])
                 );
+            $methods .= ' * ' . sprintf(
+                    $this->layoutMethod,
+                    '$this',
+                    Helper::snakeToCamelCase($property['CODE'], true),
+                    ucfirst($property['NAME'])
+                );
         }
 
         $model = str_replace('#PROPERTIES#', $properties, $model);
+        $model = str_replace('#METHODS#', $methods, $model);
+
         $data->success = $this->createModelFile($data->path, $model);
 
         return $data;

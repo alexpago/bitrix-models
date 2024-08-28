@@ -5,14 +5,9 @@ namespace Pago\Bitrix\Models;
 
 use Bitrix\Highloadblock\DataManager;
 use Bitrix\Highloadblock\HighloadBlockTable;
-use Bitrix\Iblock\ORM\ElementV1;
-use Bitrix\Iblock\ORM\ElementV2;
-use Bitrix\Main\ORM\Data\Result;
 use Bitrix\Main\ORM\Objectify\EntityObject;
 use Bitrix\Main\ORM\Query\Result as QueryResult;
 use Bitrix\Main\SystemException;
-use Pago\Bitrix\Models\Data\ElementResult;
-use Pago\Bitrix\Models\Helpers\Helper;
 use Pago\Bitrix\Models\Helpers\HlModelHelper;
 use Pago\Bitrix\Models\Queries\HlModelQuery;
 
@@ -93,73 +88,6 @@ abstract class HlModel extends BaseModel
     }
 
     /**
-     * Чтение свойств из @see $element
-     * @param string $parameter
-     * @return mixed
-     */
-    public function __get(string $parameter): mixed
-    {
-        if (null === $this->element()) {
-            return null;
-        }
-        if (! property_exists($this, $parameter)) {
-            return null;
-        }
-
-        return $this->{$parameter};
-    }
-
-    /**
-     * Вызов методов объекта ElementV1|ElementV1
-     * @param  string  $name
-     * @param  array  $arguments
-     * @return null
-     * @throws SystemException
-     * @see ElementV2
-     * @see ElementV1
-     */
-    public function __call(string $name, array $arguments)
-    {
-        // Построитель поиска
-        if (preg_match('/where([a-z])/i', $name)) {
-            $field = strtoupper(Helper::camelToSnakeCase(str_replace('where', '', $name)));
-            $operator = $arguments[1] ?? '=';
-
-            return $this->where(
-                $field,
-                $operator,
-                $arguments[0]
-            );
-        }
-
-        return null;
-    }
-
-    /**
-     * Фильтрация свойства по null
-     * @param string $where
-     * @return $this
-     */
-    final public function whereNull(string $where): static
-    {
-        $this->queryFilter['=' . $where] = null;
-
-        return $this;
-    }
-
-    /**
-     * Фильтрация свойства по not null
-     * @param string $where
-     * @return $this
-     */
-    final public function whereNotNull(string $where): static
-    {
-        $this->queryFilter['!' . $where] = null;
-
-        return $this;
-    }
-
-    /**
      * Результат запроса
      * @param int|null $limit
      * @param int|null $offset
@@ -194,76 +122,6 @@ abstract class HlModel extends BaseModel
         }
 
         return HlModelQuery::instance(static::class)->count($this->queryFilter);
-    }
-
-    /**
-     * Удаление текущего элемента или элементов запроса
-     * @return array<ElementResult>
-     */
-    public function delete(): array
-    {
-        $result = [];
-        $elements = [];
-        if (null !== $this->element()) {
-            $elements[] = $this->element();
-        }
-        if (! $elements && $this->queryIsInit) {
-            if (! $this->queryFilter) {
-                $result[] = new ElementResult(
-                    elementId: 0,
-                    success: false,
-                    error: 'Нельзя удалить объекты без фильтра. Установить фильтр'
-                );
-
-                return $result;
-            }
-            $elements = $this->get();
-        }
-        if (! $elements) {
-            return $result;
-        }
-
-        foreach ($elements as $element) {
-            /**
-             * @var EntityObject $element
-             * @var Result $delete
-             */
-            $delete = $element->delete();
-            $result[] = new ElementResult(
-                elementId: (int)$element->getId(),
-                success: $delete->isSuccess(),
-                error: $delete->getErrorMessages()
-            );
-        }
-
-        return $result;
-    }
-
-    /**
-     * Удаление текущего элемента
-     * @return bool
-     */
-    public function elementDelete(): bool
-    {
-        if (! $this->element()) {
-            return false;
-        }
-        /**
-         * @var ElementResult $delete
-         */
-        $delete = current($this->delete());
-
-        return $delete->success;
-    }
-
-    /**
-     * @return $this|null
-     */
-    public function first(): ?static
-    {
-        $elements = $this->get(1);
-
-        return $elements ? $elements[0] : null;
     }
 
     /**

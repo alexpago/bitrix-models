@@ -1,6 +1,14 @@
 <?php
+declare(strict_types=1);
 
 namespace Pago\Bitrix\Models;
+
+use Bitrix\Iblock\ORM\ElementV1;
+use Bitrix\Iblock\ORM\ElementV2;
+use Bitrix\Main\ORM\Data\Result;
+use Bitrix\Main\ORM\Objectify\EntityObject;
+use Pago\Bitrix\Models\Data\ElementResult;
+use Pago\Bitrix\Models\Helpers\Helper;
 
 /**
  * Базовый класс моделей
@@ -36,6 +44,12 @@ abstract class BaseModel
      * @var bool
      */
     protected bool $queryIsInit = false;
+
+    /**
+     * Кэш в секундах
+     * @var int
+     */
+    public int $cacheTtl = 0;
 
     /**
      * Инициализация запроса
@@ -177,6 +191,52 @@ abstract class BaseModel
         return $this->order($column, 'desc');
     }
 
+    /**
+     * Добавить кэширование запроса
+     * @param int $ttl Время жизни кэша в секундах
+     * @return $this
+     */
+    final public function withCache(int $ttl): static
+    {
+        $this->cacheTtl = $ttl;
+
+        return $this;
+    }
+
+    /**
+     * Исключить кэширование запроса
+     * @return $this
+     */
+    final public function withoutCache(): static
+    {
+        $this->cacheTtl = 0;
+
+        return $this;
+    }
+
+    /**
+     * Фильтрация свойства по not null
+     * @param string $where
+     * @return $this
+     */
+    public function whereNotNull(string $where): static
+    {
+        $this->queryFilter['!' . $where] = null;
+
+        return $this;
+    }
+
+    /**
+     * Фильтрация свойства по null
+     * @param string $where
+     * @return $this
+     */
+    public function whereNull(string $where): static
+    {
+        $this->queryFilter['=' . $where] = null;
+
+        return $this;
+    }
 
     /**
      * @param array $data
@@ -192,6 +252,40 @@ abstract class BaseModel
     }
 
     /**
+     * Первый элемент выборки
+     * @return $this|null
+     */
+    public function first(): ?static
+    {
+        $elements = $this->get(1);
+
+        return $elements ? $elements[0] : null;
+    }
+
+    /**
+     * Построитель поиска
+     * @param string $name
+     * @param array $arguments
+     * @return $this|null
+     */
+    public function __call(string $name, array $arguments)
+    {
+        // Построитель поиска
+        if (preg_match('/where([a-z])/i', $name)) {
+            $field = strtoupper(Helper::camelToSnakeCase(str_replace('where', '', $name)));
+            $operator = $arguments[1] ?? '=';
+
+            return $this->where(
+                $field,
+                $operator,
+                $arguments[0]
+            );
+        }
+
+        return null;
+    }
+
+    /**
      * @param string $parameter
      * @param $value
      * @return void
@@ -202,15 +296,97 @@ abstract class BaseModel
     }
 
     /**
-     * @param string $parameter
+     * @param string $property
      * @return mixed
      */
-    public function __get(string $parameter)
+    public function __get(string $property): mixed
     {
-        if (property_exists($this, $parameter)) {
-            return $this->{$parameter};
+        if (! property_exists($this, $property)) {
+            return null;
         }
 
+        return $this->{$property};
+    }
+
+
+    /**
+     * Удаление текущего элемента или элементов запроса
+     * @return array<ElementResult>
+     */
+    public function delete(): array
+    {
+        $result = [];
+        $elements = [];
+        if (null !== $this->element()) {
+            $elements[] = $this->element();
+        }
+        if (! $elements && $this->queryIsInit) {
+            if (! $this->queryFilter) {
+                $result[] = new ElementResult(
+                    elementId: 0,
+                    success: false,
+                    error: 'Нельзя удалить объекты без фильтра. Установить фильтр'
+                );
+
+                return $result;
+            }
+            $elements = $this->get();
+        }
+        if (! $elements) {
+            return $result;
+        }
+
+        foreach ($elements as $element) {
+            /**
+             * @var ElementV1|ElementV2|EntityObject $element
+             * @var Result $delete
+             */
+            if (method_exists($element, 'delete')) {
+                $delete = $element->delete();
+                $result[] = new ElementResult(
+                    elementId: (int)$element->getId(),
+                    success: $delete->isSuccess(),
+                    error: $delete->getErrorMessages()
+                );
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Удаление текущего элемента
+     * @return bool
+     */
+    public function elementDelete(): bool
+    {
+        if (! $this->element()) {
+            return false;
+        }
+        /**
+         * @var ElementResult $delete
+         */
+        $delete = current($this->delete());
+
+        return $delete->success;
+    }
+
+    /**
+     * @return ElementV2|ElementV1|EntityObject|null
+     */
+    public function element(): ElementV2|ElementV1|EntityObject|null
+    {
         return null;
+    }
+
+    /**
+     * Результат запроса
+     * @param int|null $limit
+     * @param int|null $offset
+     * @return array<static>
+     */
+    public function get(?int $limit = null, ?int $offset = null): array
+    {
+        return [];
     }
 }
