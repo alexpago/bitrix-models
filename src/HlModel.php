@@ -5,6 +5,7 @@ namespace Pago\Bitrix\Models;
 
 use Bitrix\Highloadblock\DataManager;
 use Bitrix\Highloadblock\HighloadBlockTable;
+use Bitrix\Main\Loader;
 use Bitrix\Main\ORM\Objectify\EntityObject;
 use Bitrix\Main\ORM\Query\Result as QueryResult;
 use Bitrix\Main\SystemException;
@@ -30,6 +31,7 @@ abstract class HlModel extends BaseModel
      */
     final public static function getEntityClass(): ?string
     {
+        Loader::includeModule('highloadblock');
         $entity = HighloadBlockTable::compileEntity(
             HighloadBlockTable::getById(self::hlId())->fetch()
         )->getDataClass();
@@ -107,7 +109,9 @@ abstract class HlModel extends BaseModel
             select: $this->querySelect,
             order: $this->queryOrder,
             limit: $this->queryLimit,
-            offset: $this->queryOffset
+            offset: $this->queryOffset,
+            cacheTtl: $this->cacheTtl,
+            cacheJoin: $this->cacheJoin
         );
     }
 
@@ -132,7 +136,8 @@ abstract class HlModel extends BaseModel
     {
         $this->modelElement = $element;
         try {
-            $this->fill($element->collectValues());
+            $this->originalProperties = $element->collectValues();
+            $this->fill($this->originalProperties);
         } catch (SystemException) {}
 
         return $this;

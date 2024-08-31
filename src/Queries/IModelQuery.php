@@ -4,12 +4,10 @@ declare(strict_types=1);
 namespace Pago\Bitrix\Models\Queries;
 
 use Bitrix\Iblock\ORM\CommonElementTable;
-use Bitrix\Iblock\Iblock;
 use Bitrix\Iblock\ORM\ElementV1;
 use Bitrix\Iblock\ORM\ElementV2;
 use Bitrix\Main\ORM\Objectify\EntityObject;
 use Bitrix\Main\ORM\Query\Result as QueryResult;
-use Bitrix\Main\SystemException;
 use CIBlockElement;
 use Pago\Bitrix\Models\Helpers\IModelHelper;
 use Pago\Bitrix\Models\IModel;
@@ -67,7 +65,8 @@ final class IModelQuery
         int $offset = 0,
         bool $includeProperties = false,
         bool $withDetailPageUrl = false,
-        int $cacheTtl = 0
+        int $cacheTtl = 0,
+        bool $cacheJoin = false
     ): array {
         /**
          * @var IModel $model
@@ -75,9 +74,12 @@ final class IModelQuery
         $model = new $this->model();
         $data = [];
         $cache = [];
-        if ($cacheTtl) {
-            $cache['cache'] = [
-                'ttl' => $cacheTtl
+        if ($cacheTtl > 0) {
+            $cache = [
+                'cache' => [
+                    'ttl' => $cacheTtl,
+                    'cache_joins' => $cacheJoin
+                ]
             ];
         }
         /**
@@ -217,20 +219,7 @@ final class IModelQuery
         if (null === $model) {
             $model = new $this->model();
         }
-        /**
-         * @var IModel $model
-         */
-        $iblockId = $model::iblockId();
-        $entity = Iblock::wakeUp($iblockId)->getEntityDataClass();
-        if (null === $entity) {
-            throw new SystemException(
-                sprintf(
-                    'Ошибка инициализации инфоблока ID = %d. Заполните API_CODE инфоблока',
-                    $iblockId
-                )
-            );
-        }
 
-        return new $entity();
+        return $model::getEntity();
     }
 }

@@ -4,10 +4,13 @@ declare(strict_types=1);
 namespace Pago\Bitrix\Models;
 
 use Bitrix\Iblock\ElementTable;
+use Bitrix\Iblock\Iblock;
+use Bitrix\Iblock\ORM\CommonElementTable;
 use Bitrix\Iblock\ORM\ElementV1;
 use Bitrix\Iblock\ORM\ElementV2;
 use Bitrix\Iblock\ORM\ValueStorage;
 use Bitrix\Main\ArgumentException;
+use Bitrix\Main\Loader;
 use Bitrix\Main\ORM\Objectify\Collection;
 use Bitrix\Main\ORM\Query\Result as QueryResult;
 use Bitrix\Main\SystemException;
@@ -142,6 +145,26 @@ class IModel extends BaseModel
     }
 
     /**
+     * Экземпляр объекта инфоблока
+     * @return CommonElementTable
+     */
+    final public static function getEntity(): CommonElementTable
+    {
+        Loader::includeModule('iblock');
+        $entity = Iblock::wakeUp(static::iblockId())->getEntityDataClass();
+        if (null === $entity) {
+            throw new SystemException(
+                sprintf(
+                    'Ошибка инициализации инфоблока ID = %d. Заполните API_CODE инфоблока',
+                    static::iblockId()
+                )
+            );
+        }
+
+        return new $entity();
+    }
+
+    /**
      * Чтение свойств из @see $element
      * @param string $property
      * @return mixed
@@ -174,7 +197,7 @@ class IModel extends BaseModel
         if (preg_match('/where([a-z])/i', $name)) {
             $field = strtoupper(Helper::camelToSnakeCase(str_replace('where', '', $name)));
             // Если это свойство, то добавим VALUE для источника поиска
-            if (! in_array($field, $this->getBaseFields())) {
+            if (! $this->isBaseField($field)) {
                 $field .= '.VALUE';
             }
             $operator = $arguments[1] ?? '=';
@@ -190,17 +213,49 @@ class IModel extends BaseModel
     }
 
     /**
-     * Фильтрация свойства по null
-     * @param string $where
+     * Построитель фильтрации
+     * @param string $property
+     * @param $operator
+     * @param $data
      * @return $this
      */
-    public function whereNull(string $where): static
+    public function where(string $property, $operator, $data = null): static
+    {
+        if (! $this->isBaseField($property) && ! str_contains($property, '.')) {
+            $property .= '.VALUE';
+        }
+
+        return parent::where($property, $operator, $data);
+    }
+
+    /**
+     * Фильтрация OR
+     * @param string $property
+     * @param $operator
+     * @param $data
+     * @return $this
+     */
+    public function orWhere(string $property, $operator, $data = null): static
+    {
+        if (! $this->isBaseField($property) && ! str_contains($property, '.')) {
+            $property .= '.VALUE';
+        }
+
+        return parent::orWhere($property, $operator, $data);
+    }
+
+    /**
+     * Фильтрация свойства по null
+     * @param string $property
+     * @return $this
+     */
+    public function whereNull(string $property): static
     {
         // Вызывается метод __call
         call_user_func_array(
             [
                 $this,
-                'where' . Helper::snakeToCamelCase($where, true)
+                'where' . Helper::snakeToCamelCase($property, true)
             ],
             [
                 'null'
@@ -212,22 +267,38 @@ class IModel extends BaseModel
 
     /**
      * Фильтрация свойства по not null
-     * @param string $where
+     * @param string $property
      * @return $this
      */
-    public function whereNotNull(string $where): static
+    public function whereNotNull(string $property): static
     {
         // Вызывается метод __call
         call_user_func_array(
             [
                 $this,
-                'where' . Helper::snakeToCamelCase($where, true)
+                'where' . Helper::snakeToCamelCase($property, true)
             ],
             [
                 'null',
                 '!='
             ]
         );
+
+        return $this;
+    }
+
+    /**
+     * Сортировка элементов
+     * @param string $column
+     * @param string $order
+     * @return $this
+     */
+    public function order(string $column, string $order = 'asc'): static
+    {
+        if ($this->isBaseField($column)) {
+            $column = strtoupper($column);
+        }
+        $this->queryOrder[$column] = $order;
 
         return $this;
     }
@@ -255,7 +326,8 @@ class IModel extends BaseModel
             offset: $this->queryOffset,
             includeProperties: $this->withProperties,
             withDetailPageUrl: $this->withDetailPageUrl,
-            cacheTtl: $this->cacheTtl
+            cacheTtl: $this->cacheTtl,
+            cacheJoin: $this->cacheJoin
         );
     }
 
@@ -315,17 +387,20 @@ class IModel extends BaseModel
     }
 
     /**
+     * Установка элемента модели
      * @param  ElementV2|ElementV1  $element
      * @return $this
      */
     public function setElement(ElementV2|ElementV1 $element): static
     {
         $this->modelElement = $element;
+        $this->originalProperties = $this->properties = $this->toArray(false);
 
         return $this;
     }
 
     /**
+     * Элемент модели
      * @return ElementV2|ElementV1|null
      */
     public function element(): ElementV2|ElementV1|null
@@ -345,6 +420,16 @@ class IModel extends BaseModel
     }
 
     /**
+     * Поле является базовым инфоблока
+     * @param string $field
+     * @return bool
+     */
+    protected function isBaseField(string $field): bool
+    {
+        return in_array(strtoupper($field), $this->getBaseFields());
+    }
+
+    /**
      * Преобразование ответа в массив без связей
      * @return array|null
      */
@@ -358,7 +443,7 @@ class IModel extends BaseModel
      * @param bool $relations Включить связи (IBLOCK_ELEMENT_ID)
      * @return array|null
      */
-    public function toArray(bool $relations = true): ?array
+    public function toArray(bool $relations = false): ?array
     {
         $element = $this->element();
         if (! $element || ! method_exists($element, 'collectValues')) {

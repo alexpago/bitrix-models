@@ -71,6 +71,5 @@ final class Helper
     {
         Loader::includeModule('highloadblock');
         Loader::includeModule('iblock');
-        Loader::includeModule('pago.bitrixmodels');
     }
 }

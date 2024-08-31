@@ -52,21 +52,37 @@ final class HlModelQuery
         array $select = ['*'],
         array $order = [],
         int $limit = 999_999_999_999,
-        int $offset = 0
+        int $offset = 0,
+        int $cacheTtl = 0,
+        bool $cacheJoin = false
     ): array {
         /**
          * @var HlModel $model
          */
         $model = new $this->model();
         $data = [];
+        $cache = [];
+        if ($cacheTtl > 0) {
+            $cache = [
+                'cache' => [
+                    'ttl' => $cacheTtl,
+                    'cache_joins' => $cacheJoin
+                ]
+            ];
+        }
         $entity = $this->getEntityClass($model);
-        $query = $entity::getList([
-            'filter' => $filter,
-            'select' => $select,
-            'order'  => $order,
-            'limit'  => $limit,
-            'offset' => $offset
-        ]);
+        $query = $entity::getList(
+            array_merge(
+                [
+                    'filter' => $filter,
+                    'select' => $select,
+                    'order' => $order,
+                    'limit' => $limit,
+                    'offset' => $offset
+                ],
+                $cache
+            )
+        );
         foreach ($query->fetchCollection() as $element) {
             /**
              * @var EntityObject $element

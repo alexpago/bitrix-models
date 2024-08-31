@@ -1,6 +1,6 @@
 # Bitrix models
 
-Данный модуль позволяет легко обращаться к инфоблокам, Highload-блокам, а так же таблицам в Bitrix CMS.
+Данный модуль позволяет легко обращаться к инфоблокам и Highload-блокам в Bitrix CMS.
 
 Текущий модуль не использует иных зависимостей и работает исключительно как фасет ядра D7.  
 
@@ -135,7 +135,10 @@ CertificatesServices::query()->setFilter(['CODE' => 'massage'])->setLimit(10)->g
 
 Метод `setFilter` устанавливает фильтр сбрасывая предыдущие условия, если они были установлены ранее. 
 
-Взамен `setFilter` можно использовать `where(column, operator, value)`. 
+Взамен `setFilter` можно использовать `where(column, operator, value)`.
+
+Для поиска OR после условия `where` можно использовать `orWhere(column, operator, value)`.
+
 
 Так же существует упрощенный вариант фильтрации по полям `whereColumn(value, operator)`. 
 Column должен быть заполнен в CamelSpace. Доступны все поля, включая свойства инфоблока. 
@@ -151,6 +154,7 @@ Column должен быть заполнен в CamelSpace. Доступны в
 CertificatesServices::query()
     ->withProperties()
     ->whereCityId(1)
+    ->orWhere('CITY_ID', 2)
     ->whereIblockSectionId(10)
     ->whereId(5, '>=') // по умолчанию всегда оператор = (равно), заполнять при необходимости указать другой
     ->get();
@@ -268,15 +272,64 @@ foreach ($elements as $element) {
 
 ```php
 $element = CertificatesServices::query()->withProperties()->first();
-// Вернет массив с результатом [Pago\Bitrix\Models\Data\ElementResult]
-$element?->delete();
+// Массив с результатом [Bitrix\Main\ORM\Data\Result]
+$element->delete();
 // Для получения результата в bool
-$element?->deleteElement();
+$element->elementDelete();
 ```
 
 Так же можно удалить элементы по фильтру не получая их экземпляры
 
 ```php
-// Массив с результатом [Pago\Bitrix\Models\Data\ElementResult]
+// Массив с результатом [Bitrix\Main\ORM\Data\Result]
 $delete = CertificatesServices::query()->withProperties()->whereActive(false)->delete();
+```
+
+### Обновление элемента
+
+Обновление элемента происходит путем присваивания ему новых свойств через магический метод __set,
+с последующим вызовом метода `save()`.
+
+```php
+$element = CertificatesServices::query()->withProperties()->first();
+$element->NAME = 'Новое имя';
+$element->SALON_ID = 135; // Свойство инфоблока SALON_ID
+// Результат сохранения Bitrix\Main\ORM\Data\Result
+$element->save();
+```
+
+Так же можно воспользоваться методом `update()`
+
+```php
+$element = CertificatesServices::query()->withProperties()->first();
+// Массив с результатом [Bitrix\Main\ORM\Data\Result]
+$element->update([
+    'NAME' => 'Новое имя'
+]);
+// Результат запроса Bitrix\Main\ORM\Data\Result
+$element->elementUpdate([
+    'NAME' => 'Новое имя 2'
+]);
+```
+
+Метод `update()` можно применять аналогично `delete()` к `query` запросу
+
+```php
+$data = [
+    'ACTIVE' => true
+];
+// Массив с результатом [Bitrix\Main\ORM\Data\Result]
+$delete = CertificatesServices::query()->withProperties()->whereActive(false)->update($data);
+```
+
+### Создание элемента
+
+Создание нового элемента аналогично обновлению через `save()`. Для начала необходимо
+создать экземпляр объекта и заполнить его данными. После заполнения вызвать метод `save()`.
+
+```php
+$element = new CertificatesServices();
+$element->NAME = 'Имя новому элементу';
+// Результат сохранения Bitrix\Main\ORM\Data\Result
+$element->save();
 ```
