@@ -5,10 +5,11 @@ namespace Pago\Bitrix\Models;
 
 use Bitrix\Iblock\ORM\ElementV1;
 use Bitrix\Iblock\ORM\ElementV2;
+use Bitrix\Main\ORM\Data\Result;
 use Bitrix\Main\ORM\Objectify\EntityObject;
 use Pago\Bitrix\Models\Helpers\Helper;
 use Pago\Bitrix\Models\Traits\ModelDeleteTrait;
-use Pago\Bitrix\Models\Traits\ModelUpdateTrait;
+use Pago\Bitrix\Models\Traits\ModelSaveTrait;
 use Pago\Bitrix\Models\Traits\ModelWhereTrait;
 
 /**
@@ -19,7 +20,7 @@ abstract class BaseModel
 {
     use ModelWhereTrait;
     use ModelDeleteTrait;
-    use ModelUpdateTrait;
+    use ModelSaveTrait;
 
     /**
      * @var array
@@ -60,13 +61,13 @@ abstract class BaseModel
      * Свойства модели
      * @var array
      */
-    public array $properties = [];
+    protected array $properties = [];
 
     /**
      * Свойства при инициализации модели
      * @var array
      */
-    public array $originalProperties = [];
+    protected array $originalProperties = [];
 
     /**
      * Кэш в секундах
@@ -314,5 +315,99 @@ abstract class BaseModel
         }
 
         return null;
+    }
+
+    /**
+     * Свойство по ключу
+     * @param string $property
+     * @return mixed
+     */
+    public function getProperty(string $property): mixed
+    {
+        return $this->properties[$property] ?? null;
+    }
+
+    /**
+     * Свойства модели
+     * @return array
+     */
+    public function getProperties(): array
+    {
+        return $this->properties;
+    }
+
+    /**
+     * Свойства модели при ее инициализации
+     * @return array
+     */
+    public function getOriginalProperties(): array
+    {
+        return $this->originalProperties;
+    }
+
+    /**
+     * Измененные свойства
+     * @return array
+     */
+    public function getChangedProperties(): array
+    {
+        return array_diff_assoc($this->properties, $this->originalProperties);
+    }
+
+    /**
+     * Событие вызываемое перед добавлением элементам
+     * @return void
+     */
+    protected function onBeforeAdd(): void
+    {
+        // actions
+    }
+
+    /**
+     * Событие вызываемое после добавление элемента
+     * @param Result $result
+     * @return void
+     */
+    protected function onAfterAdd(Result $result): void
+    {
+        // actions
+    }
+
+    /**
+     * Событие вызываемое перед обновлением элемента
+     * @return void
+     */
+    protected function onBeforeUpdate(): void
+    {
+        // actions
+    }
+
+    /**
+     * Событие вызываемое после обновления элемента
+     * @param Result $result
+     * @return void
+     */
+    protected function onAfterUpdate(Result $result): void
+    {
+        // actions
+    }
+
+    /**
+     * Событие вызываемое перед удалением элемента
+     * @return void
+     */
+    protected function onBeforeDelete(): void
+    {
+        // actions
+    }
+
+    /**
+     * Событие вызываемое после удаления элемента
+     * @param Result $result
+     * @return void
+     */
+    protected function onAfterDelete(Result $result): void
+    {
+        // actions
     }
 }

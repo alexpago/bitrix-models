@@ -6,7 +6,7 @@
 
 ## Установка
 
-1. ```composer require alexpago/bitrix-models dev-main```
+1. ```composer require alexpago/bitrix-models```
 2. Устанавливаем модуль
 3. Для удобства создания моделей создаем бинарный файл по пути bin/model. Содержимое файла:
 
@@ -229,6 +229,20 @@ CertificatesServices::query()->order('ID')->orderDesc('NAME')->get();
 > **Внимание:** если выполнить `setOrder` после `order` или `orderDesc`, то предыдущие значения будут стерты и учитываться будут только данные
 > из `setOrder`
 
+### Кеширование
+
+Запросы можно кешировать. Для этого используйте `withCache()`. Метод принимает два аргумента: время жизни
+кэша в секундах и bool для кеширования join. Так же заранее можно предопределить в классе 
+свойства `public int $cacheTtl` и `public bool $cacheJoin`.
+
+Пример запроса с кешированием на час и кешированием join:
+```php
+$elements = CertificatesServices::query()->withCache(3600, true)->get();
+```
+
+> Если в классе установлен кэш по умолчанию, то его можно отключить для определенного 
+> запроса методом `withoutCache()`
+
 ### Преобразование результатов
 
 По умолчанию данные возвращаются объектами ORM D7. 
@@ -329,7 +343,85 @@ $delete = CertificatesServices::query()->withProperties()->whereActive(false)->u
 
 ```php
 $element = new CertificatesServices();
-$element->NAME = 'Имя новому элементу';
+$element->NAME = 'Имя нового элемента';
 // Результат сохранения Bitrix\Main\ORM\Data\Result
 $element->save();
+```
+
+### События
+
+У моделей можно добавлять события на добавление, изменение и удаления элементов. 
+Доступны следующие события: 
+
+```php
+/**
+ * Событие вызываемое перед добавлением элементам
+ * @return void
+ */
+protected function onBeforeAdd(): void
+{
+    // actions
+}
+
+/**
+ * Событие вызываемое после добавление элемента
+ * @param \Bitrix\Main\ORM\Data\Result $result
+ * @return void
+ */
+protected function onAfterAdd(Result $result): void
+{
+    // actions
+}
+
+/**
+ * Событие вызываемое перед обновлением элемента
+ * @return void
+ */
+protected function onBeforeUpdate(): void
+{
+    // actions
+}
+
+/**
+ * Событие вызываемое после обновления элемента
+ * @param \Bitrix\Main\ORM\Data\Result $result
+ * @return void
+ */
+protected function onAfterUpdate(Result $result): void
+{
+    // actions
+}
+
+/**
+ * Событие вызываемое перед удалением элемента
+ * @return void
+ */
+protected function onBeforeDelete(): void
+{
+    // actions
+}
+
+/**
+ * Событие вызываемое после удаления элемента
+ * @param \Bitrix\Main\ORM\Data\Result $result
+ * @return void
+ */
+protected function onAfterDelete(Result $result): void
+{
+    // actions
+}
+```
+
+> Для получения списка изменяемых свойств можно использовать метод `getChangedProperties`
+
+Пример:
+```php
+protected function onBeforeUpdate(): void
+{
+    $data = $this->getProperties(); // Текущие свойства
+    $originalData = $this->getOriginalProperties(); // Свойства при инициализации модели
+    $changedData = $this->getChangedProperties(); // Измененные свойства
+    // Можно предопределить данные
+    $this->NAME .= ' Обновлено';
+}
 ```

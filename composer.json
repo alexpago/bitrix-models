@@ -2,6 +2,14 @@
     "name": "alexpago/bitrix-models",
     "description": "Bitrix - Models",
     "type": "bitrix-plugin",
+    "license": "MIT",
+    "keywords": [
+        "bitrix",
+        "models",
+        "bitrix models",
+        "bitrix highload",
+        "bitrix iblock"
+    ],
     "autoload": {
         "psr-4": {
             "Pago\\Bitrix\\Models\\": "src/"

@@ -6,23 +6,24 @@ namespace Pago\Bitrix\Models\Traits;
 use Bitrix\Highloadblock\DataManager;
 use Bitrix\Iblock\ORM\CommonElementTable;
 use Bitrix\Main\ORM\Data\Result;
+use Pago\Bitrix\Models\BaseModel;
 
 /**
  * Вспомогательные методы обновления элементов
  */
-trait ModelUpdateTrait
+trait ModelSaveTrait
 {
     /**
      * Свойства модели
      * @var array
      */
-    public array $properties = [];
+    protected array $properties = [];
 
     /**
      * Свойства при инициализации модели
      * @var array
      */
-    public array $originalProperties = [];
+    protected array $originalProperties = [];
 
     /**
      * Обновление/сохранение элементов
@@ -30,25 +31,31 @@ trait ModelUpdateTrait
      */
     public function save(): Result
     {
-        $data = array_diff_assoc($this->properties, $this->originalProperties);
+        $data = $this->getChangedProperties();
         if (! $data) {
             return new Result();
         }
         // Обновление текущего элемента
         if ($this->element()) {
+            $this->onBeforeUpdate();
             array_walk($data, function ($value, $field) {
                 $this->element()->set($field, $value);
             });
+            $update = $this->element()->save();
+            $this->onAfterUpdate($update);
 
-            return $this->element()->save();
+            return $update;
         }
         /**
          * Добавление нового элемента
          * @var CommonElementTable|DataManager $entity
          */
+        $this->onBeforeAdd();
         $entity = $this::getEntity();
+        $result = $entity::add($data);
+        $this->onAfterAdd($result);
 
-        return $entity::add($data);
+        return $result;
     }
 
     /**
@@ -60,7 +67,7 @@ trait ModelUpdateTrait
         $result = [];
         $elements = [];
         if (null !== $this->element()) {
-            $elements[] = $this->element();
+            $elements[] = $this;
         }
         if (! $elements && $this->queryIsInit) {
             $elements = $this->get();
@@ -70,10 +77,10 @@ trait ModelUpdateTrait
         }
 
         foreach ($elements as $element) {
-            foreach ($data as $field => $value) {
-                $element->element()->set($field, $value);
-            }
-            $result[] = $element->element()->save();
+            /**
+             * @var BaseModel $element
+             */
+            $result[] = $element->fill($data)->save();
         }
 
         return $result;

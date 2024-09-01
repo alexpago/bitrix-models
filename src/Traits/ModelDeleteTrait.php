@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Pago\Bitrix\Models\Traits;
 
 use Bitrix\Main\ORM\Data\Result;
+use Pago\Bitrix\Models\BaseModel;
 
 /**
  * Вспомогательные методы удаления элементов
@@ -19,7 +20,7 @@ trait ModelDeleteTrait
         $result = [];
         $elements = [];
         if (null !== $this->element()) {
-            $elements[] = $this->element();
+            $elements[] = $this;
         }
         if (! $elements && $this->queryIsInit) {
             $elements = $this->get();
@@ -28,7 +29,13 @@ trait ModelDeleteTrait
             return $result;
         }
         foreach ($elements as $element) {
-            $result[] = $element->element()->delete();
+            /**
+             * @var BaseModel $element
+             */
+            $element->onBeforeDelete();
+            $delete = $element->element()->delete();
+            $element->onAfterDelete($delete);
+            $result[] = $delete;
         }
 
         return $result;
