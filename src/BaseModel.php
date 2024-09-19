@@ -37,9 +37,7 @@ abstract class BaseModel
     /**
      * @var array|string[]
      */
-    protected array $queryOrder = [
-        'ID' => 'DESC'
-    ];
+    protected array $queryOrder = [];
 
     /**
      * @var int
