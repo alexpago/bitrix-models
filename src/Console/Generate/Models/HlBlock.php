@@ -126,13 +126,13 @@ class HlBlock extends Base
         if ($multiple) {
             return 'array';
         }
-        if ($type === 'datetime') {
-            return 'DateTime';
-        }
-        if ($type === 'integer') {
-            return 'int';
-        }
 
-        return 'string';
+        return match ($type) {
+            'datetime' => 'DateTime',
+            'integer' => 'int',
+            'boolean' => 'bool',
+            'string', 'html', 'iblock_section', 'double', 'file' => 'string',
+            default => 'mixed'
+        };
     }
 }

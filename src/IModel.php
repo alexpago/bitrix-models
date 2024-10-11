@@ -332,6 +332,23 @@ class IModel extends BaseModel
     }
 
     /**
+     * Результат запроса в виде массива
+     * @param int|null $limit
+     * @param int|null $offset
+     * @param bool $includeRelations
+     * @return array<static>
+     */
+    public function getArray(?int $limit = null, ?int $offset = null, bool $includeRelations = false): array
+    {
+        $result = [];
+        foreach ($this->get($limit, $offset) as $element) {
+            $result[] = $element->toArray();
+        }
+
+        return $result;
+    }
+
+    /**
      * Количество элементов в БД
      * @return int
      */
@@ -440,7 +457,7 @@ class IModel extends BaseModel
 
     /**
      * Преобразование ответа в массив
-     * @param bool $relations Включить связи (IBLOCK_ELEMENT_ID)
+     * @param bool $relations
      * @return array|null
      */
     public function toArray(bool $relations = false): ?array
@@ -456,6 +473,18 @@ class IModel extends BaseModel
         }
 
         return $result;
+    }
+
+    /**
+     * Первый элемент запроса массивом
+     * @param bool $relations Включить связи (IBLOCK_ELEMENT_ID)
+     * @return array|null
+     */
+    public function firstArray(bool $relations = false): ?array
+    {
+        $element = $this->first();
+
+        return $element?->toArray($relations);
     }
 
     /**
@@ -481,6 +510,14 @@ class IModel extends BaseModel
                 $value = $value['VALUE'];
             }
 
+            // Проверка на serialize объект
+            if (is_string($value)) {
+                $serialize = unserialize($value);
+                if (false !== $serialize) {
+                    return $serialize;
+                }
+            }
+
             return $value;
         }
 
@@ -491,6 +528,11 @@ class IModel extends BaseModel
             }
 
             return $result;
+        }
+
+        // DateTime
+        if ($collectionValue instanceof DateTime) {
+            return $collectionValue->format('Y-m-d H:i:s');
         }
 
         return $collectionValue;

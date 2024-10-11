@@ -164,6 +164,8 @@ CertificatesServices::query()
 ```php
 CertificatesServices::query()->whereId(100)->first(); // first() вернет экземпляр класса
 ```
+> Если нужно получить элемент в виде массива, используйте `firstArray()`. Вызов метода `firstArray()` аналогичен цепочке
+> вызовов `first()->toArray()`
 
 ### Выборка
 
@@ -174,6 +176,9 @@ CertificatesServices::query()->whereId(100)->first(); // first() вернет э
 ```php
 CertificatesServices::query()->withProperties()->get();
 ```
+
+> Если нужно получить элементы в виде массива, используйте `getArray()`. Вызов метода `getArray()` аналогичен цепочке
+> вызовов `get()->toArray()`
 
 Пример с заполнением выборки:
 ```php
@@ -347,6 +352,8 @@ $element->NAME = 'Имя нового элемента';
 // Результат сохранения Bitrix\Main\ORM\Data\Result
 $element->save();
 ```
+
+> Так же можно использовать метод `put()`, который вызовет метод `save()` и вернет экземпляр созданного объекта. 
 
 ### События
 

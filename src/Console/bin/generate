@@ -19,5 +19,5 @@ $_SERVER['SERVER_NAME'] = 'cli';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/vendor/autoload.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_before.php';
 
-$service = new \Pago\Bitrix\Models\Console\Generate\GenerateModelService($argv);
+$service = new Pago\Bitrix\Models\Console\Generate\GenerateModelService($argv);
 return;
