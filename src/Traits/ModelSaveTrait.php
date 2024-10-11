@@ -97,4 +97,19 @@ trait ModelSaveTrait
 
         return $result && $result[0]->isSuccess();
     }
+
+    /**
+     * Сохранение элемента и его получение
+     * @return $this
+     */
+    public function put(): static
+    {
+        $save = $this->save();
+        if (! $save->isSuccess() || ! $save->getId()) {
+            return $this;
+        }
+        $this->{$this->primary} = $save->getId();
+
+        return $this->refresh();
+    }
 }

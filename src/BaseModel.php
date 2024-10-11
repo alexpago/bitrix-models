@@ -80,6 +80,18 @@ abstract class BaseModel
     public bool $cacheJoin = false;
 
     /**
+     * Primary столбец
+     * @var string
+     */
+    public string $primary = 'ID';
+
+    /**
+     * Получение данных массивом
+     * @return array|null
+     */
+    abstract function toArray() :?array;
+
+    /**
      * Инициализация запроса
      * @return static
      */
@@ -243,14 +255,39 @@ abstract class BaseModel
     }
 
     /**
-     * Первый элемент выборки
+     * Первый элемент запроса
      * @return $this|null
      */
     public function first(): ?static
     {
+        // Если объект уже создан, вернем его же
+        if ($this->element()) {
+            return $this;
+        }
         $elements = $this->get(1);
 
         return $elements ? $elements[0] : null;
+    }
+
+    /**
+     * Первый элемент запроса массивом
+     * @return array|null
+     */
+    public function firstArray(): ?array
+    {
+        $element = $this->first();
+
+        return $element?->toArray();
+
+    }
+
+    /**
+     * Проверка существования элемента
+     * @return bool
+     */
+    public function exists(): bool
+    {
+        return null !== $this->element();
     }
 
     /**
@@ -270,6 +307,57 @@ abstract class BaseModel
     public function get(?int $limit = null, ?int $offset = null): array
     {
         return [];
+    }
+
+    /**
+     * Результат запроса в виде массива
+     * @param int|null $limit
+     * @param int|null $offset
+     * @return array<static>
+     */
+    public function getArray(?int $limit = null, ?int $offset = null): array
+    {
+        $result = [];
+        dd(count($this->get($limit, $offset)));
+        foreach ($this->get($limit, $offset) as $element) {
+            $result[] = $element->toArray();
+        }
+
+        return $result;
+    }
+
+    /**
+     * Установка пагинации
+     * @param int $page
+     * @param int $itemsPerPage
+     * @return $this
+     */
+    public function paginate(int $page = 1, int $itemsPerPage = 20): static
+    {
+        $offset = 0;
+        if ($page > 1) {
+            $offset = ($page - 1) * $itemsPerPage;
+        }
+
+        return $this->setOffset($offset)->setLimit($itemsPerPage);
+    }
+
+    /**
+     * Актуализировать элемент из БД
+     * @return $this
+     */
+    public function refresh(): static
+    {
+        // Элемент привязываем к ID, если такового нет, не обновляем
+        if (! $this->{$this->primary}) {
+            return $this;
+        }
+
+        return $this
+            ->setFilter([
+                '=' . $this->primary => $this->{$this->primary}
+            ])
+            ->first();
     }
 
     /**

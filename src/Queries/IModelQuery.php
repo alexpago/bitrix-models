@@ -6,6 +6,7 @@ namespace Pago\Bitrix\Models\Queries;
 use Bitrix\Iblock\ORM\CommonElementTable;
 use Bitrix\Iblock\ORM\ElementV1;
 use Bitrix\Iblock\ORM\ElementV2;
+use Bitrix\Main\Loader;
 use Bitrix\Main\ORM\Objectify\EntityObject;
 use Bitrix\Main\ORM\Query\Result as QueryResult;
 use CIBlockElement;
@@ -127,7 +128,13 @@ final class IModelQuery
             if ($withDetailPageUrl) {
                 $model->detailPageUrl = $detailPageUrls[(int)$element->getId()];
             }
-            $data[] = $model->setElement($element);
+            // Установка параметров объекта как в запросе
+            if ($withDetailPageUrl) {
+                $model->withDetailPageUrl();
+            }
+            $data[] = $model
+                ->withProperties($includeProperties)
+                ->setElement($element);
         }
 
         return $data;
@@ -216,6 +223,7 @@ final class IModelQuery
      */
     private function getEntityClass(?IModel $model = null): CommonElementTable
     {
+        Loader::includeModule('iblock');
         if (null === $model) {
             $model = new $this->model();
         }
