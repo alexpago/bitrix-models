@@ -8,9 +8,11 @@ use Bitrix\Iblock\IblockTable;
 use Bitrix\Main\SystemException;
 use Pago\Bitrix\Models\Console\Generate\Models\HlBlock;
 use Pago\Bitrix\Models\Console\Generate\Models\Iblock;
+use Pago\Bitrix\Models\Console\Generate\Models\Table;
 use Pago\Bitrix\Models\Console\Traits\ConsoleBaseMethods;
 use Pago\Bitrix\Models\Console\Traits\ConsoleMessage;
 use Pago\Bitrix\Models\Helpers\Helper;
+use Pago\Bitrix\Models\Helpers\TableModelHelper;
 
 /**
  * Консольные команды генерация модели
@@ -41,17 +43,27 @@ final class GenerateModelService
      */
     public function __construct(array $arguments)
     {
+        // Подключаем базовые модули highload, iblock
         Helper::includeBaseModules();
+        // Фильтруем входящие данные
         $this->inputArguments = $arguments;
         array_shift($arguments);
         $this->arguments = $this->getArguments($arguments);
-        $this->method = $this->getMethod($arguments);
+        // Считываем метод переданный при вызове (тип генерации модели)
+        $this->method = $this->getMethodFromInputArguments($arguments);
+
         match (is_string($this->method) ? strtolower($this->method) : null) {
+            // Генерация инфоблоков
             'iblock', 'ib' => call_user_func(function () {
-                $this->iblock();
+                $this->generateIModel();
             }),
+            // Генерация highload блоков
             'hlblock', 'highloadblock', 'hb', 'hl' => call_user_func(function () {
-                $this->hlBlock();
+                $this->generateHlModel();
+            }),
+            // Генерация таблиц
+            'table' => call_user_func(function () {
+                $this->generateTableModel();
             }),
             default => call_user_func(function () {
                 $this->hello();
@@ -60,21 +72,56 @@ final class GenerateModelService
     }
 
     /**
+     * Базовое сообщение открытия в командной строке
      * @return void
      */
     public function hello(): void
     {
         $this->success('Добро пожаловать в генератор моделей');
-        $this->info('Выберите тип модель для генерации и введите его. Доступны: iblock. hlblock');
+        $this->info('Выберите тип модель для генерации и введите его. Доступны: iblock, hlblock, table');
         $this->info('Пример: php ' . $this->inputArguments[0] . ' iblock');
     }
 
     /**
-     * Генерация highload блоков
+     * Генерация таблиц
      * @return void
      * @throws SystemException
      */
-    public function hlBlock(): void
+    public function generateTableModel(): void
+    {
+        $message = 'Введите название таблицы через пробел для генерации модели.' . PHP_EOL;
+        $message .= 'Для выхода введите "q".';
+        do {
+            $this->info($message);
+            $input = explode(' ', strtolower($this->question('Ввод')));
+
+            foreach ($input as $tableName) {
+                if (! $tableName) {
+                    continue;
+                }
+                if (! TableModelHelper::instance()->checkTableExists($tableName)) {
+                    $this->error(sprintf('Таблица %s не найдена', $tableName));
+                    continue;
+                }
+                $generate = (new Table($tableName))->generateModel();
+                if ($generate->success) {
+                    $this->creationSuccess($generate, $tableName);
+                } else {
+                    $this->creationError($generate, $tableName);
+                }
+                $this->creationWarnings($generate);
+            }
+
+            $input = strtolower($this->question('Продолжить y/n?'));
+        } while (! ('n' === $input || 'q' === $input));
+    }
+
+    /**
+     * Генерация highload
+     * @return void
+     * @throws SystemException
+     */
+    public function generateHlModel(): void
     {
         $lists = HighloadBlockTable::query()
             ->setSelect([
@@ -127,7 +174,7 @@ final class GenerateModelService
      * @return void
      * @throws SystemException
      */
-    public function iblock(): void
+    public function generateIModel(): void
     {
         $lists = IblockTable::query()
             ->setSelect([
@@ -214,14 +261,14 @@ final class GenerateModelService
     /**
      * Сообщение успешного создания модели
      * @param GenerateResult $result
-     * @param int $id
+     * @param int|string $id
      * @return void
      */
-    private function creationSuccess(GenerateResult $result, int $id): void
+    private function creationSuccess(GenerateResult $result, int|string $id): void
     {
         $this->success(
             sprintf(
-                'Успешно создана модель %d - %s\%s',
+                'Успешно создана модель %s - %s\%s',
                 $id,
                 $result->namespace,
                 $result->name
@@ -233,14 +280,14 @@ final class GenerateModelService
     /**
      * Сообщение ошибки создания модели
      * @param GenerateResult $result
-     * @param int $id
+     * @param int|string $id
      * @return void
      */
-    private function creationError(GenerateResult $result, int $id): void
+    private function creationError(GenerateResult $result, int|string $id): void
     {
         $this->warning(
             sprintf(
-                'Ошибка создания модели %d - %s\%s',
+                'Ошибка создания модели %s - %s\%s',
                 $id,
                 $result->namespace,
                 $result->name

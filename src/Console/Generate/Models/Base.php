@@ -11,9 +11,9 @@ use Bitrix\Main\SystemException;
 abstract class Base
 {
     /**
-     * @var int
+     * @var int|null
      */
-    protected int $id;
+    protected ?int $id = null;
 
     /**
      * Стандартный namespace будущей модели
@@ -32,6 +32,18 @@ abstract class Base
      * @var string
      */
     protected string $model;
+
+    /**
+     * Шаблон генерации свойств
+     * @var string
+     */
+    protected string $layoutProperty = '@property %s %s // %s';
+
+    /**
+     * Шаблон генерации методов
+     * @var string
+     */
+    protected string $layoutMethod = '@method %s where%s(mixed $data, string $operator = \'\') // %s';
 
     /**
      * Создание файла модели
@@ -54,5 +66,27 @@ abstract class Base
         }
 
         return (bool)file_put_contents($path . '/' . $file, $content);
+    }
+
+    /**
+     * Возвращаемый тип свойства полученным через свойство модели
+     * @param  string  $type
+     * @param  bool  $multiple
+     * @return string
+     */
+    protected function getPropertyReturnType(string $type, bool $multiple): string
+    {
+        if ($multiple) {
+            return 'array';
+        }
+
+        return match ($type) {
+            'datetime' => 'DateTime',
+            'date' => 'Date',
+            'integer', 'int' => 'int',
+            'boolean' => 'bool',
+            'string', 'html', 'iblock_section', 'double', 'file', 'varchar', 'char', 'float', 'decimal' => 'string',
+            default => 'mixed'
+        };
     }
 }

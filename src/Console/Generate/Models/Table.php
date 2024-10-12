@@ -3,26 +3,26 @@ declare(strict_types=1);
 
 namespace Pago\Bitrix\Models\Console\Generate\Models;
 
-use Bitrix\Highloadblock\HighloadBlockTable;
 use Bitrix\Main\SystemException;
 use Pago\Bitrix\Models\Console\Generate\GenerateResult;
 use Pago\Bitrix\Models\Helpers\Helper;
-use Pago\Bitrix\Models\Helpers\HlModelHelper;
+use Pago\Bitrix\Models\Helpers\TableModelHelper;
 
 /**
- * Генерация моделей для highload блоков
+ * Генерация моделей для таблиц
  */
-class HlBlock extends Base
+class Table extends Base
 {
     /**
-     * @param int $id
+     * @param string $tableName Название таблицы
      */
-    public function __construct(int $id)
+    public function __construct(
+        public string $tableName
+    )
     {
-        $this->id = $id;
         $this->pathModels = $_SERVER['DOCUMENT_ROOT'];
         $this->namespace = str_replace('Console\Generate\Models', 'Models', __NAMESPACE__);
-        $this->model = file_get_contents(__DIR__ . '/../Layouts/hlblock');
+        $this->model = file_get_contents(__DIR__ . '/../Layouts/table');
     }
 
     /**
@@ -33,28 +33,30 @@ class HlBlock extends Base
     public function generateModel(): GenerateResult
     {
         $data = $this->getModelData();
+        $modelName = Helper::snakeToCamelCase($data->name, true);
         $model = $this->model;
         $model = str_replace('#NAMESPACE#', $data->namespace, $model);
-        $model = str_replace('#NAME#', $data->name, $model);
+        $model = str_replace('#TABLE_NAME#', $data->name, $model);
+        $model = str_replace('#NAME#', $modelName, $model);
 
         // Генерация документации
         $properties = ''; $methods = '';
-        foreach (HlModelHelper::getProperties($this->id) as $property) {
+        foreach (TableModelHelper::instance()->getTableColumns($this->tableName) as $property) {
             if ('' !== $properties) {
                 $properties .= PHP_EOL;
                 $methods .= PHP_EOL;
             }
             $properties .= ' * ' . sprintf(
                     $this->layoutProperty,
-                    $this->getPropertyReturnType($property['USER_TYPE_ID'], $property['MULTIPLE'] === 'Y'),
-                    $property['CODE'],
-                    ucfirst($property['NAME'])
+                    $this->getPropertyReturnType($property['type'], false),
+                    $property['name'],
+                    ucfirst($property['name'])
                 );
             $methods .= ' * ' . sprintf(
                     $this->layoutMethod,
                     '$this',
-                    Helper::snakeToCamelCase($property['CODE'], true),
-                    ucfirst($property['NAME'])
+                    Helper::snakeToCamelCase($property['name'], true),
+                    ucfirst($property['name'])
                 );
         }
 
@@ -69,39 +71,19 @@ class HlBlock extends Base
     /**
      * Сбор информации для генерации модели
      * @return GenerateResult
-     * @throws SystemException
      */
     private function getModelData(): GenerateResult
     {
-        $code = $this->getHlBlock()['NAME'];
         $filename = sprintf(
             '%s.php',
-            strtolower(Helper::getOnlyAlphaNumeric($code))
+            strtolower(Helper::getOnlyAlphaNumeric($this->tableName))
         );
 
         return new GenerateResult(
             path: $this->pathModels . '/' . $filename,
             filename: $this->pathModels . '/' . $filename,
             namespace: $this->namespace,
-            name: $code
+            name: $this->tableName
         );
-    }
-
-    /**
-     * @return array
-     * @throws SystemException
-     */
-    private function getHlBlock(): array
-    {
-        return HighloadBlockTable::query()
-            ->setSelect([
-                'ID',
-                'NAME',
-                'TABLE_NAME'
-            ])
-            ->setFilter([
-                '=ID' => $this->id
-            ])
-            ->fetch();
     }
 }

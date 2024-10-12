@@ -9,12 +9,6 @@ namespace Pago\Bitrix\Models\Traits;
 trait ModelWhereTrait
 {
     /**
-     * Фильтр запроса
-     * @var array
-     */
-    protected array $queryFilter = [];
-
-    /**
      * Фильтрация
      * @param string $property
      * @param $operator

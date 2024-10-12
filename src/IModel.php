@@ -32,6 +32,7 @@ use Pago\Bitrix\Models\Queries\IModelQuery;
  * @property DateTime ACTIVE_TO
  * @property int SORT
  * @property string NAME
+ * @property string|null DETAIL_PAGE_URL
  * @property int PREVIEW_PICTURE
  * @property int DETAIL_PICTURE
  * @property string PREVIEW_TEXT_TYPE

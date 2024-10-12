@@ -20,16 +20,6 @@ class Iblock extends Base
     private string $layoutMethodProperty = '@method %s get%s() // %s';
 
     /**
-     * @var string
-     */
-    private string $layoutProperty = '@property %s %s // %s';
-
-    /**
-     * @var string
-     */
-    private string $layoutMethod = '@method %s where%s(mixed $data, string $operator = \'\') // %s';
-
-    /**
      * @param int $id
      */
     public function __construct(int $id)
@@ -113,6 +103,21 @@ class Iblock extends Base
     }
 
     /**
+     * Возвращаемый тип свойства полученным через свойство модели
+     * @param  string  $type
+     * @param  bool  $multiple
+     * @return string
+     */
+    protected function getPropertyReturnType(string $type, bool $multiple): string
+    {
+        if ($multiple) {
+            return 'array';
+        }
+
+        return 'string';
+    }
+
+    /**
      * Сбор информации для генерации модели
      * @return GenerateResult
      * @throws SystemException
@@ -173,21 +178,6 @@ class Iblock extends Base
                 '=ID' => $this->id
             ])
             ->fetch();
-    }
-
-    /**
-     * Возвращаемый тип свойства полученным через свойство модели
-     * @param  string  $type
-     * @param  bool  $multiple
-     * @return string
-     */
-    private function getPropertyReturnType(string $type, bool $multiple): string
-    {
-        if ($multiple) {
-            return 'array';
-        }
-
-        return 'string';
     }
 
     /**

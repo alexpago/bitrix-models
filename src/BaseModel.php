@@ -3,12 +3,17 @@ declare(strict_types=1);
 
 namespace Pago\Bitrix\Models;
 
+use Bitrix\Highloadblock\DataManager;
+use Bitrix\Iblock\ORM\CommonElementTable;
 use Bitrix\Iblock\ORM\ElementV1;
 use Bitrix\Iblock\ORM\ElementV2;
 use Bitrix\Main\ORM\Data\Result;
 use Bitrix\Main\ORM\Objectify\EntityObject;
+use Pago\Bitrix\Models\Helpers\DynamicTable;
 use Pago\Bitrix\Models\Helpers\Helper;
 use Pago\Bitrix\Models\Traits\ModelDeleteTrait;
+use Pago\Bitrix\Models\Traits\ModelBaseTrait;
+use Pago\Bitrix\Models\Traits\ModelRelationTrait;
 use Pago\Bitrix\Models\Traits\ModelSaveTrait;
 use Pago\Bitrix\Models\Traits\ModelWhereTrait;
 
@@ -18,9 +23,11 @@ use Pago\Bitrix\Models\Traits\ModelWhereTrait;
 #[\AllowDynamicProperties]
 abstract class BaseModel
 {
+    use ModelBaseTrait;
     use ModelWhereTrait;
     use ModelDeleteTrait;
     use ModelSaveTrait;
+    use ModelRelationTrait;
 
     /**
      * @var array
@@ -92,6 +99,12 @@ abstract class BaseModel
     abstract function toArray() :?array;
 
     /**
+     * Получение экземпляра класса
+     * @return CommonElementTable|DataManager|DynamicTable|null
+     */
+    abstract static function getEntity(): CommonElementTable|DataManager|DynamicTable|null;
+
+    /**
      * Инициализация запроса
      * @return static
      */
@@ -101,121 +114,6 @@ abstract class BaseModel
         $static->queryIsInit = true;
 
         return $static;
-    }
-
-    /**
-     * @return $this
-     */
-    final public function setFilter(array $filter): static
-    {
-        $this->queryFilter = $filter;
-
-        return $this;
-    }
-
-    /**
-     * @param int $limit
-     * @return $this
-     */
-    final public function setLimit(int $limit): static
-    {
-        $this->queryLimit = $limit;
-
-        return $this;
-    }
-
-    /**
-     * @param int $limit
-     * @return $this
-     */
-    final public function limit(int $limit): static
-    {
-        return $this->setLimit($limit);
-    }
-
-    /**
-     * @param int $offset
-     * @return $this
-     */
-    final public function setOffset(int $offset): static
-    {
-        $this->queryOffset = $offset;
-
-        return $this;
-    }
-
-    /**
-     * @param int $offset
-     * @return $this
-     */
-    final public function offset(int $offset): static
-    {
-        return $this->setOffset($offset);
-    }
-
-    /**
-     * @param array $select
-     * @return $this
-     */
-    final public function setSelect(array $select): static
-    {
-        $this->querySelect = $select;
-
-        return $this;
-    }
-
-    /**
-     * @param mixed ...$arguments
-     * @return $this
-     */
-    final public function select(...$arguments): static
-    {
-        foreach ($arguments as $select) {
-            if (!is_array($select)) {
-                $select = [$select];
-            }
-            foreach ($select as $item) {
-                $this->querySelect[] = $item;
-            }
-        }
-
-        return $this;
-    }
-
-    /**
-     * @param array $order
-     * @return $this
-     */
-    final public function setOrder(array $order): static
-    {
-        $this->queryOrder = $order;
-
-        return $this;
-    }
-
-    /**
-     * Добавить кэширование запроса
-     * @param int $ttl Время жизни кэша в секундах
-     * @param bool $withJoin Кэшировать JOIN
-     * @return $this
-     */
-    final public function withCache(int $ttl = 3600, bool $withJoin = false): static
-    {
-        $this->cacheTtl = $ttl;
-        $this->cacheJoin = $withJoin;
-
-        return $this;
-    }
-
-    /**
-     * Исключить кэширование запроса
-     * @return $this
-     */
-    final public function withoutCache(): static
-    {
-        $this->cacheTtl = 0;
-
-        return $this;
     }
 
     /**
@@ -229,29 +127,6 @@ abstract class BaseModel
         }
 
         return $this;
-    }
-
-    /**
-     * Сортировка
-     * @param string $column
-     * @param string $order
-     * @return $this
-     */
-    public function order(string $column, string $order = 'asc'): static
-    {
-        $this->queryOrder[$column] = $order;
-
-        return $this;
-    }
-
-    /**
-     * Сортировка по убыванию
-     * @param string $column
-     * @return $this
-     */
-    public function orderDesc(string $column): static
-    {
-        return $this->order($column, 'desc');
     }
 
     /**

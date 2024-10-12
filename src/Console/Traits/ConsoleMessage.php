@@ -4,18 +4,17 @@ declare(strict_types=1);
 namespace Pago\Bitrix\Models\Console\Traits;
 
 /**
- * Форматирование и вывод сообщенийв консоль
+ * Форматирование и вывод сообщений в консоль
  */
 trait ConsoleMessage
 {
     /**
      * @param  string  $str
-     * @param  string  $type
      * @return string|null
      */
-    public function question(string $str, string $type = 'i'): ?string
+    public function question(string $str): ?string
     {
-        return readline(trim($this->getConsoleTextColor($str, $type)) . ': ');
+        return readline(trim($str) . ': ');
     }
 
     /**

@@ -14,18 +14,6 @@ use Pago\Bitrix\Models\BaseModel;
 trait ModelSaveTrait
 {
     /**
-     * Свойства модели
-     * @var array
-     */
-    protected array $properties = [];
-
-    /**
-     * Свойства при инициализации модели
-     * @var array
-     */
-    protected array $originalProperties = [];
-
-    /**
      * Обновление/сохранение элементов
      * @return Result
      */
@@ -105,10 +93,11 @@ trait ModelSaveTrait
     public function put(): static
     {
         $save = $this->save();
-        if (! $save->isSuccess() || ! $save->getId()) {
+        if (! $save->isSuccess()) {
             return $this;
         }
-        $this->{$this->primary} = $save->getId();
+        $primary = $this->getProperty($this->primary) ?: $save->getId();
+        $this->{$this->primary} = $primary;
 
         return $this->refresh();
     }

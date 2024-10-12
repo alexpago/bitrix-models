@@ -37,7 +37,7 @@ trait ConsoleBaseMethods
      * @param  array  $arguments
      * @return string|null
      */
-    public function getMethod(array $arguments): ?string
+    public function getMethodFromInputArguments(array $arguments): ?string
     {
         return array_key_exists(0, $arguments) ? $arguments[0] : null;
     }

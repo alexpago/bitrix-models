@@ -6,10 +6,10 @@ namespace Pago\Bitrix\Models\Queries;
 use Bitrix\Iblock\ORM\CommonElementTable;
 use Bitrix\Iblock\ORM\ElementV1;
 use Bitrix\Iblock\ORM\ElementV2;
-use Bitrix\Main\Loader;
 use Bitrix\Main\ORM\Objectify\EntityObject;
 use Bitrix\Main\ORM\Query\Result as QueryResult;
 use CIBlockElement;
+use Pago\Bitrix\Models\Helpers\Helper;
 use Pago\Bitrix\Models\Helpers\IModelHelper;
 use Pago\Bitrix\Models\IModel;
 
@@ -36,6 +36,7 @@ final class IModelQuery
     public function __construct(string $model)
     {
         $this->model = $model;
+        Helper::includeBaseModules();
     }
 
     /**
@@ -55,7 +56,9 @@ final class IModelQuery
      * @param int $limit
      * @param int $offset
      * @param bool $includeProperties
+     * @param bool $withDetailPageUrl
      * @param int $cacheTtl
+     * @param bool $cacheJoin
      * @return array
      */
     public function fetch(
@@ -223,7 +226,6 @@ final class IModelQuery
      */
     private function getEntityClass(?IModel $model = null): CommonElementTable
     {
-        Loader::includeModule('iblock');
         if (null === $model) {
             $model = new $this->model();
         }
