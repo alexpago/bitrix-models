@@ -128,16 +128,18 @@ final class IModelQuery
              * @var IModel $model
              */
             $model = clone $model;
+            $model->withProperties($includeProperties)->setElement($element);
             if ($withDetailPageUrl) {
                 $model->detailPageUrl = $detailPageUrls[(int)$element->getId()];
+                $model->fill([
+                    'DETAIL_PAGE_URL' => $detailPageUrls[(int)$element->getId()]
+                ]);
             }
             // Установка параметров объекта как в запросе
             if ($withDetailPageUrl) {
                 $model->withDetailPageUrl();
             }
-            $data[] = $model
-                ->withProperties($includeProperties)
-                ->setElement($element);
+            $data[] = $model;
         }
 
         return $data;
