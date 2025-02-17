@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Pago\Bitrix\Models\Helpers;
 
+use Bitrix\Main\Application;
 use Bitrix\Main\Entity\FloatField;
 use Bitrix\Main\ORM\Data\DataManager;
 use Bitrix\Main\ORM\Fields\BooleanField;
@@ -109,6 +110,15 @@ final class TableModelHelper
         }
 
         return $this->getColumns($createTableSql);
+    }
+
+    /**
+     * Является ли подключение MySQL
+     * @return bool
+     */
+    public function isMysqlConnect(): bool
+    {
+        return strtolower(Application::getConnection()->getType()) === 'mysql';
     }
 
     /**

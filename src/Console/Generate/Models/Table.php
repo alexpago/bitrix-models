@@ -37,6 +37,12 @@ class Table extends Base
     public function generateModel(): GenerateResult
     {
         $data = $this->getModelData();
+        // Создание модели возможно только для MySQL
+        if (! TableModelHelper::instance()->isMysqlConnect()) {
+            $data->warnings[] = 'Автоматические создание моделей возможно только для MySQL';
+
+            return $data;
+        }
         $modelName = Helper::snakeToCamelCase($data->name, true);
         $model = $this->model;
         $model = str_replace('#NAMESPACE#', $data->namespace, $model);
