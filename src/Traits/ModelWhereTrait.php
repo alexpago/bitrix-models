@@ -46,7 +46,7 @@ trait ModelWhereTrait
         }
         $lastFilterKey = array_key_last($this->queryFilter);
         $lastFilterValue = end($this->queryFilter);
-        if (!$lastFilterValue) {
+        if (! $lastFilterValue) {
             $this->queryFilter[$operator . $property] = $data;
 
             return $this;

@@ -10,6 +10,9 @@ use Bitrix\Main\SystemException;
  */
 abstract class Base
 {
+    // Стандартный путь моделей
+    public const DEFAULT_MODEL_PATH = '/local/lib/models';
+
     /**
      * @var int|null
      */
@@ -44,6 +47,12 @@ abstract class Base
      * @var string
      */
     protected string $layoutMethod = '@method %s where%s(mixed $data, string $operator = \'\') // %s';
+
+    /**
+     * Стандартный namespace
+     * @var string
+     */
+    protected string $defaultModeNamespace = 'Local\\Models';
 
     /**
      * Создание файла модели
@@ -88,5 +97,30 @@ abstract class Base
             'string', 'html', 'iblock_section', 'double', 'file', 'varchar', 'char', 'float', 'decimal' => 'string',
             default => 'mixed'
         };
+    }
+
+    /**
+     * Получить путь генерации модели
+     * @param string|null $path
+     * @param string|null $pathPostfix
+     * @return string
+     */
+    protected function getModelPath(?string $path, ?string $pathPostfix = null): string
+    {
+        // Путь не указан, зададим стандартный
+        if (! is_string($path) || ! $path) {
+            $path = $_SERVER['DOCUMENT_ROOT'] . $this::DEFAULT_MODEL_PATH;
+            if ($pathPostfix) {
+                $path .= '/' . $pathPostfix;
+            }
+
+            return $path;
+        }
+
+        if (str_contains($path, $_SERVER['DOCUMENT_ROOT'])) {
+            return preg_replace('/\/+/', '/', $path);
+        }
+
+        return preg_replace('/\/+/', '/', $_SERVER['DOCUMENT_ROOT'] . '/' . $path);
     }
 }

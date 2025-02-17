@@ -13,7 +13,10 @@
     "autoload": {
         "psr-4": {
             "Pago\\Bitrix\\Models\\": "src/"
-        }
+        },
+        "files": [
+            "src/include.php"
+        ]
     },
     "authors": [
         {

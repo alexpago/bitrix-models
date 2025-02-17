@@ -20,13 +20,18 @@ class Iblock extends Base
     private string $layoutMethodProperty = '@method %s get%s() // %s';
 
     /**
-     * @param int $id
+     * @param int $id ID инфоблока
+     * @param string|null $path Директория модели
+     * @param string|null $namespace Namespace модели
      */
-    public function __construct(int $id)
+    public function __construct(
+        int     $id,
+        ?string $path = null,
+        ?string $namespace = null)
     {
         $this->id = $id;
-        $this->pathModels = $_SERVER['DOCUMENT_ROOT'];
-        $this->namespace = str_replace('Console\Generate\Models', 'Models', __NAMESPACE__);
+        $this->pathModels = $this->getModelPath($path, 'iblock');
+        $this->namespace = $namespace ?: $this->defaultModeNamespace . '\\Iblock';
         $this->model = file_get_contents(__DIR__ . '/../Layouts/iblock');
     }
 

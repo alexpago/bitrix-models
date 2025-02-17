@@ -39,13 +39,14 @@ class GenerateResult
     public array $warnings;
 
     public function __construct(
-        bool $success = false,
+        bool   $success = false,
         string $path = '',
         string $filename = '',
         string $namespace = '',
         string $name = '',
-        array $warnings = []
-    ) {
+        array  $warnings = []
+    )
+    {
         $this->success = $success;
         $this->path = $path;
         $this->filename = $filename;

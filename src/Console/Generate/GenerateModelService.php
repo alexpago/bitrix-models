@@ -103,8 +103,15 @@ final class GenerateModelService
                     $this->error(sprintf('Таблица %s не найдена', $tableName));
                     continue;
                 }
-                $generate = (new Table($tableName))->generateModel();
+                $generateModel = new Table(
+                    tableName: $tableName,
+                    path: $this->getArgument('path'),
+                    namespace: $this->getArgument('namespace')
+                );
+                $generate = $generateModel->generateModel();
                 if ($generate->success) {
+                    // Заменим имя таблицы на CamelCase, так как указано имя таблицы
+                    $generate->name = Helper::snakeToCamelCase($generate->name, true);
                     $this->creationSuccess($generate, $tableName);
                 } else {
                     $this->creationError($generate, $tableName);
@@ -156,7 +163,12 @@ final class GenerateModelService
                 if (! $hlId) {
                     continue;
                 }
-                $generate = (new HlBlock($hlId))->generateModel();
+                $generateModel = new HlBlock(
+                    id: $hlId,
+                    path: $this->getArgument('path'),
+                    namespace: $this->getArgument('namespace')
+                );
+                $generate = $generateModel->generateModel();
                 if ($generate->success) {
                     $this->creationSuccess($generate, $hlId);
                 } else {
@@ -220,7 +232,11 @@ final class GenerateModelService
                 if (! $iblockId) {
                     continue;
                 }
-                $generateModel = new Iblock($iblockId);
+                $generateModel = new Iblock(
+                    id: $iblockId,
+                    path: $this->getArgument('path'),
+                    namespace: $this->getArgument('namespace')
+                );
                 $generate = $generateModel->generateModel();
                 if ($generate->success) {
                     $this->creationSuccess($generate, $iblockId);
@@ -294,5 +310,16 @@ final class GenerateModelService
             )
         );
         $this->warning('Файл: ' . $result->path);
+    }
+
+    /**
+     * Получить аргумент
+     * @param string $argument
+     * @param string|null $default
+     * @return string|null
+     */
+    private function getArgument(string $argument, ?string $default = null): ?string
+    {
+        return $this->arguments[$argument] ?? $default;
     }
 }

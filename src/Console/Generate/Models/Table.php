@@ -15,13 +15,17 @@ class Table extends Base
 {
     /**
      * @param string $tableName Название таблицы
+     * @param ?string $path Директория модели
+     * @param string|null $namespace Namespace модели
      */
     public function __construct(
-        public string $tableName
+        public string  $tableName,
+        public ?string $path = null,
+        ?string        $namespace = null
     )
     {
-        $this->pathModels = $_SERVER['DOCUMENT_ROOT'];
-        $this->namespace = str_replace('Console\Generate\Models', 'Models', __NAMESPACE__);
+        $this->pathModels = $this->getModelPath($path);
+        $this->namespace = $namespace ?: $this->defaultModeNamespace;
         $this->model = file_get_contents(__DIR__ . '/../Layouts/table');
     }
 

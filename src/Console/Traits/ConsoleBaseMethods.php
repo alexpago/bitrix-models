@@ -18,13 +18,13 @@ trait ConsoleBaseMethods
         $result = [];
 
         foreach ($arguments as $argument) {
-            preg_match('/--([\w\-]+)=([\w\-]+)/', $argument, $argumentNameAndData);
+            preg_match('/--([\w\-]+)=([\w\-\/\\\]+)/', $argument, $argumentNameAndData);
             if (! $argumentNameAndData) {
                 $result[$argument] = '';
             }
             $name = $argumentNameAndData[1] ?? null;
             $value = $argumentNameAndData[2] ?? null;
-            if (null == $name || null === $value) {
+            if (null === $name || null === $value) {
                 continue;
             }
             $result[$name] = $value;

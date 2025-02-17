@@ -15,13 +15,19 @@ use Pago\Bitrix\Models\Helpers\HlModelHelper;
 class HlBlock extends Base
 {
     /**
-     * @param int $id
+     * @param int $id ID справочника
+     * @param string|null $path Директория создания модели
+     * @param string|null $namespace Namespace модели
      */
-    public function __construct(int $id)
+    public function __construct(
+        int     $id,
+        ?string $path = null,
+        ?string $namespace = null
+    )
     {
         $this->id = $id;
-        $this->pathModels = $_SERVER['DOCUMENT_ROOT'];
-        $this->namespace = str_replace('Console\Generate\Models', 'Models', __NAMESPACE__);
+        $this->pathModels = $this->getModelPath($path, 'highload');
+        $this->namespace = $namespace ?: $this->defaultModeNamespace . '\\Highload';
         $this->model = file_get_contents(__DIR__ . '/../Layouts/hlblock');
     }
 
