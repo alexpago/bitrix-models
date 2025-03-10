@@ -114,7 +114,9 @@ class Iblock extends Base
         }
 
         return $this->iblock->elementUpdate([
-            'API_CODE' => Helper::snakeToCamelCase($code, true),
+            'API_CODE' => Helper::getOnlyAlphaNumeric(
+                Helper::snakeToCamelCase($code, true)
+            ),
         ]);
     }
 
@@ -139,14 +141,17 @@ class Iblock extends Base
         if (! $this->iblock->CODE) {
             $warnings[] = 'У инфоблока отсутствует символьный код. Рекомендуется установить его';
         }
-        $code = $this->iblock->CODE;
-        if (! $code) {
-            $code = 'iblock' . $this->iblock->ID;
+        $name = $this->iblock->CODE;
+        if ($name && ! Helper::isSnakeCaseString($name)) {
+            $warnings[] = 'Инфоблок содержит код не в формате snake_case. Разрешенные символы a-z_';
         }
-        $code = Helper::snakeToCamelCase($code, true);
+        if (! Helper::isSnakeCaseString($name)) {
+            $name = 'iblock' . $this->iblock->ID;
+        }
+        $name = Helper::snakeToCamelCase($name, true);
         $filename = sprintf(
             '%s.php',
-            strtolower(Helper::getOnlyAlphaNumeric($code))
+            strtolower(Helper::getOnlyAlphaNumeric($name))
         );
         $path = $this->pathModels . '/' . $filename;
         $namespace = $this->namespace;
@@ -155,7 +160,7 @@ class Iblock extends Base
             path: $path,
             filename: $filename,
             namespace: $namespace,
-            name: $code,
+            name: $name,
             warnings: $warnings
         );
     }

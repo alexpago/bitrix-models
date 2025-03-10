@@ -12,6 +12,7 @@ if (! defined('B_PROLOG_INCLUDED'))
 if (defined('B_PROLOG_INCLUDED')) {
     // Автозагрузка классов
     $pathModels = $_SERVER['DOCUMENT_ROOT'] . Models\Base::DEFAULT_MODEL_PATH;
+
     if (is_dir($pathModels)) {
         Loader::registerNamespace('Local\\Models', $pathModels);
     }

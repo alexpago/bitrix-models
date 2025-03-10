@@ -28,7 +28,10 @@ final class Helper
      */
     public static function snakeToCamelCase(string $input, bool $ucfirst = false): string
     {
-        $input = str_replace(' ', '', ucwords(str_replace('_', ' ', strtolower($input))));
+        // Заменим нижний слэш и тире
+        $input = str_replace(['_', '-'], ' ', strtolower($input));
+        // Заменим пробелы на верхний символ
+        $input = str_replace(' ', '', ucwords($input));
 
         return $ucfirst ? ucfirst($input) : lcfirst($input);
     }
@@ -71,5 +74,39 @@ final class Helper
     {
         Loader::includeModule('highloadblock');
         Loader::includeModule('iblock');
+    }
+
+    /**
+     * Проверка является ли строка camelSpace
+     * @param string|null $string $string
+     * @return bool
+     */
+    public static function isCamelCaseString(string|null $string): bool
+    {
+        if (! $string) {
+            return false;
+        }
+        preg_match('/([A-Za-z]+)/', $string, $matches);
+        if (! $matches || empty($matches[1])) {
+            return false;
+        }
+        return strlen($matches[1]) === strlen($string);
+    }
+
+    /**
+     * Проверка является ли строка snake_case
+     * @param string|null $string $string
+     * @return bool
+     */
+    public static function isSnakeCaseString(string|null $string): bool
+    {
+        if (! $string) {
+            return false;
+        }
+        preg_match('/([a-z_]+)/', $string, $matches);
+        if (! $matches || empty($matches[1])) {
+            return false;
+        }
+        return strlen($matches[1]) === strlen($string);
     }
 }
