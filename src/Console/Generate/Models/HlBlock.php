@@ -8,6 +8,7 @@ use Bitrix\Main\SystemException;
 use Pago\Bitrix\Models\Console\Generate\GenerateResult;
 use Pago\Bitrix\Models\Helpers\Helper;
 use Pago\Bitrix\Models\Helpers\HlModelHelper;
+use Pago\Bitrix\Models\Models\HlblockTable;
 
 /**
  * Генерация моделей для highload блоков
@@ -15,9 +16,15 @@ use Pago\Bitrix\Models\Helpers\HlModelHelper;
 class HlBlock extends Base
 {
     /**
+     * @var HlblockTable
+     */
+    private HlblockTable $hlblock;
+
+    /**
      * @param int $id ID справочника
      * @param string|null $path Директория создания модели
      * @param string|null $namespace Namespace модели
+     * @throws SystemException
      */
     public function __construct(
         int     $id,
@@ -26,6 +33,15 @@ class HlBlock extends Base
     )
     {
         $this->id = $id;
+        $hlblock = HlblockTable::query()
+            ->whereId($id)
+            ->first();
+        if (! $hlblock) {
+            throw new SystemException('Ошибка. Не найден справочник ' . $id);
+        }
+        $this->hlblock = $hlblock;
+
+        // Пути модели
         $this->pathModels = $this->getModelPath($path, 'highload');
         $this->namespace = $namespace ?: $this->defaultModeNamespace . '\\Highload';
         $this->model = file_get_contents(__DIR__ . '/../Layouts/hlblock');
@@ -75,11 +91,10 @@ class HlBlock extends Base
     /**
      * Сбор информации для генерации модели
      * @return GenerateResult
-     * @throws SystemException
      */
     private function getModelData(): GenerateResult
     {
-        $code = $this->getHlBlock()['NAME'];
+        $code = $this->hlblock->NAME;
         $filename = sprintf(
             '%s.php',
             strtolower(Helper::getOnlyAlphaNumeric($code))
@@ -91,23 +106,5 @@ class HlBlock extends Base
             namespace: $this->namespace,
             name: $code
         );
-    }
-
-    /**
-     * @return array
-     * @throws SystemException
-     */
-    private function getHlBlock(): array
-    {
-        return HighloadBlockTable::query()
-            ->setSelect([
-                'ID',
-                'NAME',
-                'TABLE_NAME'
-            ])
-            ->setFilter([
-                '=ID' => $this->id
-            ])
-            ->fetch();
     }
 }

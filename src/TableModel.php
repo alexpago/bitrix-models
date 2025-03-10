@@ -20,6 +20,8 @@ abstract class TableModel extends BaseModel
     use ModelBaseTrait;
     use ModelWhereTrait;
 
+    public const TABLE_NAME = null;
+
     /**
      * @var EntityObject|null
      */
@@ -31,8 +33,10 @@ abstract class TableModel extends BaseModel
      */
     public static function getTableName(): string
     {
+        if (static::TABLE_NAME) {
+            return static::TABLE_NAME;
+        }
         $class = explode('\\', get_called_class());
-
         return Helper::camelToSnakeCase((string)end($class));
     }
 
