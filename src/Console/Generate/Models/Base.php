@@ -46,7 +46,7 @@ abstract class Base
      * Шаблон генерации методов
      * @var string
      */
-    protected string $layoutMethod = '@method %s where%s(mixed $data, string $operator = \'\') // %s';
+    protected string $layoutMethod = '@method Builder|%s where%s(mixed $data, string $operator = \'\') // %s';
 
     /**
      * Стандартный namespace

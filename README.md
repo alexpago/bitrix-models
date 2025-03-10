@@ -162,6 +162,108 @@ CertificatesServices::query()->setFilter(['CODE' => 'massage'])->setLimit(10)->g
 
 Для поиска OR после условия `where` можно использовать `orWhere(column, operator, value)`.
 
+### Доступные методы фильтрации:
+### `where(string $property, $operator, $data = null): static`
+Фильтрация с условием для указанного свойства.
+
+**Параметры:**
+- `$property` (string): Имя свойства, по которому производится фильтрация.
+- `$operator` (mixed): Оператор сравнения (например, '=', '>', '<', '!=', и т.д.).
+- `$data` (mixed): Значение для сравнения с данным свойством. Если не указано, то используется оператор как значение.
+
+---
+
+### `whereIn(string $property, array $values): static`
+Фильтрация с условием `IN` для указанного свойства.
+
+**Параметры:**
+- `$property` (string): Имя свойства.
+- `$values` (array): Массив значений, которые должны быть проверены для этого свойства.
+
+---
+
+### `orWhereIn(string $property, array $values): static`
+Фильтрация с условием `OR IN` для указанного свойства.
+
+**Параметры:**
+- `$property` (string): Имя свойства.
+- `$values` (array): Массив значений, которые должны быть проверены для этого свойства.
+
+---
+
+### `whereProperty(string $property, string $property2): static`
+Фильтрация, где свойство сравнивается с другим свойством.
+
+**Параметры:**
+- `$property` (string): Имя первого свойства.
+- `$property2` (string): Имя второго свойства, с которым сравнивается первое.
+
+
+---
+
+### `orWhereProperty(string $property, string $property2): static`
+Фильтрация с условием `OR`, где одно свойство сравнивается с другим.
+
+**Параметры:**
+- `$property` (string): Имя первого свойства.
+- `$property2` (string): Имя второго свойства.
+
+---
+
+### `whereNotIn(string $property, array $values): static`
+Фильтрация с условием `NOT IN` для указанного свойства.
+
+**Параметры:**
+- `$property` (string): Имя свойства.
+- `$values` (array): Массив значений, которые не должны соответствовать данному свойству.
+
+---
+
+### `orWhere(string $property, $operator, $data = null): static`
+Фильтрация с условием `OR` для указанного свойства.
+
+**Параметры:**
+- `$property` (string): Имя свойства.
+- `$operator` (mixed): Оператор сравнения (например, '=', '>', '<', '!=', и т.д.).
+- `$data` (mixed): Значение для сравнения с данным свойством. Если не указано, то используется оператор как значение.
+
+---
+
+### `whereNotNull(string $property): static`
+Фильтрация по условию "не равно NULL" для указанного свойства.
+
+**Параметры:**
+- `$property` (string): Имя свойства.
+
+---
+
+### `whereNull(string $property): static`
+Фильтрация по условию "равно NULL" для указанного свойства.
+
+**Параметры:**
+- `$property` (string): Имя свойства.
+
+---
+
+### `whereBetween(string $property, $min, $max): static`
+Фильтрация с условием "между" для указанного свойства.
+
+**Параметры:**
+- `$property` (string): Имя свойства.
+- `$min` (mixed): Минимальное значение диапазона.
+- `$max` (mixed): Максимальное значение диапазона.
+
+---
+
+### `whereNotBetween(string $property, $min, $max): static`
+Фильтрация с условием "не между" для указанного свойства.
+
+**Параметры:**
+- `$property` (string): Имя свойства.
+- `$min` (mixed): Минимальное значение диапазона.
+- `$max` (mixed): Максимальное значение диапазона.
+
+
 
 Также существует упрощенный вариант фильтрации по полям `whereColumn(value, operator)`. 
 Column должен быть заполнен в CamelSpace. Доступны все поля, включая свойства инфоблока. 
@@ -322,10 +424,8 @@ foreach ($elements as $element) {
 
 ```php
 $element = CertificatesServices::query()->withProperties()->first();
-// Массив с результатом [Bitrix\Main\ORM\Data\Result]
+// Результат Bitrix\Main\ORM\Data\Result
 $element->delete();
-// Для получения результата в bool
-$element->elementDelete();
 ```
 
 Так же можно удалить элементы по фильтру не получая их экземпляры
@@ -352,13 +452,9 @@ $element->save();
 
 ```php
 $element = CertificatesServices::query()->withProperties()->first();
-// Массив с результатом [Bitrix\Main\ORM\Data\Result]
+// Result Bitrix\Main\ORM\Data\Result
 $element->update([
     'NAME' => 'Новое имя'
-]);
-// Результат запроса Bitrix\Main\ORM\Data\Result
-$element->elementUpdate([
-    'NAME' => 'Новое имя 2'
 ]);
 ```
 

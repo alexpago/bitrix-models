@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace Pago\Bitrix\Models;
 
-use Bitrix\Iblock\ElementTable;
+use Exception;
 use Bitrix\Iblock\Iblock;
 use Bitrix\Iblock\ORM\CommonElementTable;
 use Bitrix\Iblock\ORM\ElementV1;
@@ -17,6 +17,7 @@ use Bitrix\Main\SystemException;
 use Bitrix\Main\Type\DateTime;
 use Pago\Bitrix\Models\Helpers\Helper;
 use Pago\Bitrix\Models\Helpers\IModelHelper;
+use Pago\Bitrix\Models\Queries\Builder;
 use Pago\Bitrix\Models\Queries\IModelQuery;
 
 /**
@@ -61,48 +62,42 @@ use Pago\Bitrix\Models\Queries\IModelQuery;
  * @method string getXmlId
  * @method string getCode
  * @method string getTags
- * @method $this whereId(int|array $id)
- * @method $this whereTimestampX(DateTime|array $date, string $operator = '')
- * @method $this whereModifiedBy(int|array $id)
- * @method $this whereDateCreate(DateTime|array $date, string $operator = '')
- * @method $this whereCreatedBy(int|array $id)
- * @method $this whereIblockSectionId(int|array $id)
- * @method $this whereActive(bool $active)
- * @method $this whereActiveFrom(DateTime $date, string $operator = '')
- * @method $this whereActiveTo(DateTime $date, string $operator = '')
- * @method $this whereSort(int|array $sort)
- * @method $this whereName(string|array $name)
- * @method $this wherePreviewPicture(int|array $picture)
- * @method $this wherePreviewText(string|array $input)
- * @method $this wherePreviewTextType(string|array $input)
- * @method $this whereDetailPicture(int|array $picture)
- * @method $this whereDetailText(string|array $input)
- * @method $this whereXmlId(string|array $input)
- * @method $this whereCode(string|array $code)
- * @method $this whereTags(string|array $input)
+ * @method Builder|$this whereId(int|array $id)
+ * @method Builder|$this whereTimestampX(DateTime|array $date, string $operator = '')
+ * @method Builder|$this whereModifiedBy(int|array $id)
+ * @method Builder|$this whereDateCreate(DateTime|array $date, string $operator = '')
+ * @method Builder|$this whereCreatedBy(int|array $id)
+ * @method Builder|$this whereIblockSectionId(int|array $id)
+ * @method Builder|$this whereActive(bool $active)
+ * @method Builder|$this whereActiveFrom(DateTime $date, string $operator = '')
+ * @method Builder|$this whereActiveTo(DateTime $date, string $operator = '')
+ * @method Builder|$this whereSort(int|array $sort)
+ * @method Builder|$this whereName(string|array $name)
+ * @method Builder|$this wherePreviewPicture(int|array $picture)
+ * @method Builder|$this wherePreviewText(string|array $input)
+ * @method Builder|$this wherePreviewTextType(string|array $input)
+ * @method Builder|$this whereDetailPicture(int|array $picture)
+ * @method Builder|$this whereDetailText(string|array $input)
+ * @method Builder|$this whereXmlId(string|array $input)
+ * @method Builder|$this whereCode(string|array $code)
+ * @method Builder|$this whereTags(string|array $input)
  */
 class IModel extends BaseModel
 {
+    // Переопределение кода инфоблока
     public const IBLOCK_CODE = null;
+
+    // Переопределение ID инфоблока
     public const IBLOCK_ID = null;
+
+    // Производить unserialize перед выдачей свойств инфоблока, если оно serialized
+    public const UNSERIALIZE_PROPERTIES = true;
 
     /**
      * Ссылка на детальную страницу
      * @var string|null
      */
     public ?string $detailPageUrl = null;
-
-    /**
-     * Включить свойства в query
-     * @var bool
-     */
-    private bool $withProperties = false;
-
-    /**
-     * Прогрузить детальные страницы в query
-     * @var bool
-     */
-    private bool $withDetailPageUrl = false;
 
     /**
      * Элемент модели
@@ -118,13 +113,13 @@ class IModel extends BaseModel
     final public static function iblockId(): int
     {
         if (null !== static::IBLOCK_ID) {
-            return (int)static::IBLOCK_ID;
+            return static::IBLOCK_ID;
         }
         $class = explode('\\', static::class);
         $class = end($class);
         // Определение id из названия класса
         if (! static::IBLOCK_CODE && preg_match('/iblock([0-9])+/i', $class)) {
-            return (int)Helper::getOnlyNumeric($class);
+            return Helper::getOnlyNumeric($class);
         }
         // По символьному коду
         if (static::IBLOCK_CODE) {
@@ -132,6 +127,26 @@ class IModel extends BaseModel
         }
 
         return IModelHelper::getIblockIdByCode(Helper::camelToSnakeCase($class));
+    }
+
+    /**
+     * Экземпляр объекта инфоблока
+     * @return CommonElementTable
+     * @throws Exception
+     */
+    final public static function getEntity(): CommonElementTable
+    {
+        Loader::includeModule('iblock');
+        $entity = Iblock::wakeUp(static::iblockId())->getEntityDataClass();
+        if (null === $entity) {
+            throw new SystemException(
+                sprintf(
+                    'Ошибка инициализации инфоблока ID = %d. Заполните API_CODE инфоблока',
+                    static::iblockId()
+                )
+            );
+        }
+        return new $entity();
     }
 
     /**
@@ -146,23 +161,13 @@ class IModel extends BaseModel
     }
 
     /**
-     * Экземпляр объекта инфоблока
-     * @return CommonElementTable
+     * Результат запроса
+     * @param Builder $builder
+     * @return array<static>
      */
-    final public static function getEntity(): CommonElementTable
+    public static function get(Builder $builder): array
     {
-        Loader::includeModule('iblock');
-        $entity = Iblock::wakeUp(static::iblockId())->getEntityDataClass();
-        if (null === $entity) {
-            throw new SystemException(
-                sprintf(
-                    'Ошибка инициализации инфоблока ID = %d. Заполните API_CODE инфоблока',
-                    static::iblockId()
-                )
-            );
-        }
-
-        return new $entity();
+        return IModelQuery::instance(static::class)->fetch($builder);
     }
 
     /**
@@ -175,8 +180,35 @@ class IModel extends BaseModel
         if (null === $this->element()) {
             return null;
         }
-
         return $this->toArrayOnlyValues()[$property] ?? null;
+    }
+
+    /**
+     * Количество элементов в БД
+     * @param Builder|null $builder
+     * @return int
+     */
+    final public static function count(?Builder $builder = null): int
+    {
+        if (! $builder) {
+            $builder = new Builder(new static());
+        }
+        return IModelQuery::instance(static::class)->count($builder);
+    }
+
+    /**
+     * Установка элемента модели
+     * @param IModel $model
+     * @param ElementV2|ElementV1 $element
+     * @param Builder $builder
+     * @return $this
+     */
+    final public static function setElement(IModel $model, ElementV2|ElementV1 $element, Builder $builder): IModel
+    {
+        $model->builder = $builder;
+        $model->modelElement = $element;
+        $model->originalProperties = $model->properties = $model->toArray();
+        return $model;
     }
 
     /**
@@ -194,172 +226,7 @@ class IModel extends BaseModel
         if ($this->element() && preg_match('/get([a-z])/i', $name)) {
             return $this->element()->$name($arguments);
         }
-        // Построитель поиска
-        if (preg_match('/where([a-z])/i', $name)) {
-            $field = strtoupper(Helper::camelToSnakeCase(str_replace('where', '', $name)));
-            // Если это свойство, то добавим VALUE для источника поиска
-            if (! $this->isBaseField($field)) {
-                $field .= '.VALUE';
-            }
-            $operator = $arguments[1] ?? '=';
-
-            return $this->where(
-                $field,
-                $operator,
-                $arguments[0]
-            );
-        }
-
         return null;
-    }
-
-    /**
-     * Построитель фильтрации
-     * @param string $property
-     * @param $operator
-     * @param $data
-     * @return $this
-     */
-    public function where(string $property, $operator, $data = null): static
-    {
-        if (! $this->isBaseField($property) && ! str_contains($property, '.')) {
-            $property .= '.VALUE';
-        }
-
-        return parent::where($property, $operator, $data);
-    }
-
-    /**
-     * Фильтрация OR
-     * @param string $property
-     * @param $operator
-     * @param $data
-     * @return $this
-     */
-    public function orWhere(string $property, $operator, $data = null): static
-    {
-        if (! $this->isBaseField($property) && ! str_contains($property, '.')) {
-            $property .= '.VALUE';
-        }
-
-        return parent::orWhere($property, $operator, $data);
-    }
-
-    /**
-     * Фильтрация свойства по null
-     * @param string $property
-     * @return $this
-     */
-    public function whereNull(string $property): static
-    {
-        // Вызывается метод __call
-        call_user_func_array(
-            [
-                $this,
-                'where' . Helper::snakeToCamelCase($property, true)
-            ],
-            [
-                'null'
-            ]
-        );
-
-        return $this;
-    }
-
-    /**
-     * Фильтрация свойства по not null
-     * @param string $property
-     * @return $this
-     */
-    public function whereNotNull(string $property): static
-    {
-        // Вызывается метод __call
-        call_user_func_array(
-            [
-                $this,
-                'where' . Helper::snakeToCamelCase($property, true)
-            ],
-            [
-                'null',
-                '!='
-            ]
-        );
-
-        return $this;
-    }
-
-    /**
-     * Сортировка элементов
-     * @param string $column
-     * @param string $order
-     * @return $this
-     */
-    public function order(string $column, string $order = 'asc'): static
-    {
-        if ($this->isBaseField($column)) {
-            $column = strtoupper($column);
-        }
-        $this->queryOrder[$column] = $order;
-
-        return $this;
-    }
-
-    /**
-     * Результат запроса
-     * @param int|null $limit
-     * @param int|null $offset
-     * @return array<static>
-     */
-    public function get(?int $limit = null, ?int $offset = null): array
-    {
-        if (null !== $limit) {
-            $this->setLimit($limit);
-        }
-        if (null !== $offset) {
-            $this->setOffset($offset);
-        }
-
-        return IModelQuery::instance(static::class)->fetch(
-            filter: $this->queryFilter,
-            select: $this->querySelect,
-            order: $this->queryOrder,
-            limit: $this->queryLimit,
-            offset: $this->queryOffset,
-            includeProperties: $this->withProperties,
-            withDetailPageUrl: $this->withDetailPageUrl,
-            cacheTtl: $this->cacheTtl,
-            cacheJoin: $this->cacheJoin
-        );
-    }
-
-    /**
-     * Результат запроса в виде массива
-     * @param int|null $limit
-     * @param int|null $offset
-     * @param bool $includeRelations
-     * @return array<static>
-     */
-    public function getArray(?int $limit = null, ?int $offset = null, bool $includeRelations = false): array
-    {
-        $result = [];
-        foreach ($this->get($limit, $offset) as $element) {
-            $result[] = $element->toArray();
-        }
-
-        return $result;
-    }
-
-    /**
-     * Количество элементов в БД
-     * @return int
-     */
-    public function count(): int
-    {
-        if (! $this->queryIsInit) {
-            return 0;
-        }
-
-        return IModelQuery::instance(static::class)->count($this->queryFilter);
     }
 
     /**
@@ -382,42 +249,6 @@ class IModel extends BaseModel
     }
 
     /**
-     * Включить свойства инфоблока
-     * @param bool $includeProperties
-     * @return $this
-     */
-    public function withProperties(bool $includeProperties = true): self
-    {
-        $this->withProperties = $includeProperties;
-
-        return $this;
-    }
-
-    /**
-     * Получить элементы с начальной загрузкой детальной страницы
-     * @return $this
-     */
-    public function withDetailPageUrl(): self
-    {
-        $this->withDetailPageUrl = true;
-
-        return $this;
-    }
-
-    /**
-     * Установка элемента модели
-     * @param  ElementV2|ElementV1  $element
-     * @return $this
-     */
-    public function setElement(ElementV2|ElementV1 $element): static
-    {
-        $this->modelElement = $element;
-        $this->originalProperties = $this->properties = $this->toArray(false);
-
-        return $this;
-    }
-
-    /**
      * Элемент модели
      * @return ElementV2|ElementV1|null
      */
@@ -427,33 +258,12 @@ class IModel extends BaseModel
     }
 
     /**
-     * Базовые поля инфоблока
-     * @return array
-     */
-    protected function getBaseFields(): array
-    {
-        return array_keys(
-            (new ElementTable())->getEntity()->getFields()
-        );
-    }
-
-    /**
-     * Поле является базовым инфоблока
-     * @param string $field
-     * @return bool
-     */
-    protected function isBaseField(string $field): bool
-    {
-        return in_array(strtoupper($field), $this->getBaseFields());
-    }
-
-    /**
      * Преобразование ответа в массив без связей
      * @return array|null
      */
     public function toArrayOnlyValues(): ?array
     {
-        return $this->toArray(false);
+        return $this->toArray();
     }
 
     /**
@@ -467,25 +277,10 @@ class IModel extends BaseModel
         if (! $element || ! method_exists($element, 'collectValues')) {
             return null;
         }
-        $result = [];
 
-        foreach ($element->collectValues() as $property => $value) {
-            $result[$property] = $this->getToArrayValue($value, $relations);
-        }
-
-        return $result;
-    }
-
-    /**
-     * Первый элемент запроса массивом
-     * @param bool $relations Включить связи (IBLOCK_ELEMENT_ID)
-     * @return array|null
-     */
-    public function firstArray(bool $relations = false): ?array
-    {
-        $element = $this->first();
-
-        return $element?->toArray($relations);
+        return array_map(function ($value) use ($relations) {
+            return $this->getToArrayValue($value, $relations);
+        }, $element->collectValues());
     }
 
     /**
@@ -512,7 +307,7 @@ class IModel extends BaseModel
             }
 
             // Проверка на serialize объект
-            if (is_string($value)) {
+            if ($this::UNSERIALIZE_PROPERTIES && is_string($value)) {
                 $serialize = unserialize($value);
                 if (false !== $serialize) {
                     return $serialize;

@@ -3,12 +3,12 @@ declare(strict_types=1);
 
 namespace Pago\Bitrix\Models\Queries;
 
+use CIBlockElement;
 use Bitrix\Iblock\ORM\CommonElementTable;
 use Bitrix\Iblock\ORM\ElementV1;
 use Bitrix\Iblock\ORM\ElementV2;
 use Bitrix\Main\ORM\Objectify\EntityObject;
 use Bitrix\Main\ORM\Query\Result as QueryResult;
-use CIBlockElement;
 use Pago\Bitrix\Models\Helpers\Helper;
 use Pago\Bitrix\Models\Helpers\IModelHelper;
 use Pago\Bitrix\Models\IModel;
@@ -50,39 +50,22 @@ final class IModelQuery
 
     /**
      * Получение элементов запроса
-     * @param array $filter
-     * @param array $select
-     * @param array $order
-     * @param int $limit
-     * @param int $offset
-     * @param bool $includeProperties
-     * @param bool $withDetailPageUrl
-     * @param int $cacheTtl
-     * @param bool $cacheJoin
+     * @param Builder $builder
      * @return array
      */
-    public function fetch(
-        array $filter = [],
-        array $select = ['*'],
-        array $order = [],
-        int $limit = 999_999_999_999,
-        int $offset = 0,
-        bool $includeProperties = false,
-        bool $withDetailPageUrl = false,
-        int $cacheTtl = 0,
-        bool $cacheJoin = false
-    ): array {
+    public function fetch(Builder $builder): array
+    {
         /**
          * @var IModel $model
          */
         $model = new $this->model();
         $data = [];
         $cache = [];
-        if ($cacheTtl > 0) {
+        if ($builder->cacheTtl > 0) {
             $cache = [
                 'cache' => [
-                    'ttl' => $cacheTtl,
-                    'cache_joins' => $cacheJoin
+                    'ttl' => $builder->cacheTtl,
+                    'cache_joins' => $builder->cacheJoin
                 ]
             ];
         }
@@ -95,15 +78,15 @@ final class IModelQuery
         $query = $this->getEntityClass($model)::getList(
             array_merge(
                 [
-                    'filter' => $filter,
+                    'filter' => $builder->getFilter(),
                     'select' => $this->select(
                         $model,
-                        $select,
-                        $includeProperties
+                        $builder->getSelect(),
+                        $builder->withProperties
                     ),
-                    'order'  => $order,
-                    'limit'  => $limit,
-                    'offset' => $offset
+                    'order'  => $builder->getOrder(),
+                    'limit'  => $builder->getLimit(),
+                    'offset' => $builder->getOffset(),
                 ],
                 $cache
             )
@@ -118,26 +101,21 @@ final class IModelQuery
 
         // Загрузка детальных ссылок элементов
         $detailPageUrls = [];
-        if ($withDetailPageUrl) {
+        if ($builder->withDetailPageUrl) {
             $detailPageUrls = $this->getDetailPageUrl($elementIds);
         }
-
         foreach ($elements as $element) {
             /**
              * @var ElementV1|ElementV2 $element
              * @var IModel $model
              */
             $model = clone $model;
-            $model->withProperties($includeProperties)->setElement($element);
-            if ($withDetailPageUrl) {
+            $model = $model::setElement($model, $element, $builder);
+            if ($builder->withDetailPageUrl) {
                 $model->detailPageUrl = $detailPageUrls[(int)$element->getId()];
                 $model->fill([
                     'DETAIL_PAGE_URL' => $detailPageUrls[(int)$element->getId()]
                 ]);
-            }
-            // Установка параметров объекта как в запросе
-            if ($withDetailPageUrl) {
-                $model->withDetailPageUrl();
             }
             $data[] = $model;
         }
@@ -160,14 +138,12 @@ final class IModelQuery
 
     /**
      * Фасет GetCount
-     * @param array $filter
+     * @param Builder $builder
      * @return int
      * @see CommonElementTable::getCount()
      */
-    public function count(array $filter = []): int {
-        $entity = $this->getEntityClass();
-
-        return $entity::getCount($filter);
+    public function count(Builder $builder): int {
+        return $this->getEntityClass()::getCount($builder->getFilter());
     }
 
     /**

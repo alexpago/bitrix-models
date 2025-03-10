@@ -5,17 +5,11 @@ namespace Pago\Bitrix\Models;
 
 use Bitrix\Highloadblock\DataManager;
 use Bitrix\Iblock\ORM\CommonElementTable;
-use Bitrix\Iblock\ORM\ElementV1;
-use Bitrix\Iblock\ORM\ElementV2;
+use Bitrix\Main\DB\Exception;
+use Bitrix\Main\Error;
 use Bitrix\Main\ORM\Data\Result;
-use Bitrix\Main\ORM\Objectify\EntityObject;
 use Pago\Bitrix\Models\Helpers\DynamicTable;
-use Pago\Bitrix\Models\Helpers\Helper;
-use Pago\Bitrix\Models\Traits\ModelDeleteTrait;
-use Pago\Bitrix\Models\Traits\ModelBaseTrait;
-use Pago\Bitrix\Models\Traits\ModelRelationTrait;
-use Pago\Bitrix\Models\Traits\ModelSaveTrait;
-use Pago\Bitrix\Models\Traits\ModelWhereTrait;
+use Pago\Bitrix\Models\Queries\Builder;
 
 /**
  * Базовый класс моделей
@@ -23,45 +17,6 @@ use Pago\Bitrix\Models\Traits\ModelWhereTrait;
 #[\AllowDynamicProperties]
 abstract class BaseModel
 {
-    use ModelBaseTrait;
-    use ModelWhereTrait;
-    use ModelDeleteTrait;
-    use ModelSaveTrait;
-    use ModelRelationTrait;
-
-    /**
-     * @var array
-     */
-    protected array $queryFilter = [];
-
-    /**
-     * @var array
-     */
-    protected array $querySelect = [
-        '*'
-    ];
-
-    /**
-     * @var array|string[]
-     */
-    protected array $queryOrder = [];
-
-    /**
-     * @var int
-     */
-    protected int $queryLimit = 999_999_999_999;
-
-    /**
-     * @var int
-     */
-    protected int $queryOffset = 0;
-
-    /**
-     * Построитель запросов инициирован
-     * @var bool
-     */
-    protected bool $queryIsInit = false;
-
     /**
      * Свойства модели
      * @var array
@@ -75,28 +30,21 @@ abstract class BaseModel
     protected array $originalProperties = [];
 
     /**
-     * Кэш в секундах
-     * @var int
-     */
-    public int $cacheTtl = 0;
-
-    /**
-     * Кэширование JOIN
-     * @var bool
-     */
-    public bool $cacheJoin = false;
-
-    /**
      * Primary столбец
      * @var string
      */
     public string $primary = 'ID';
 
     /**
+     * @var Builder|null
+     */
+    public ?Builder $builder = null;
+
+    /**
      * Получение данных массивом
      * @return array|null
      */
-    abstract function toArray() :?array;
+    abstract function toArray(): ?array;
 
     /**
      * Получение экземпляра класса
@@ -105,15 +53,77 @@ abstract class BaseModel
     abstract static function getEntity(): CommonElementTable|DataManager|DynamicTable|null;
 
     /**
-     * Инициализация запроса
-     * @return static
+     * Результат запроса
+     * @param Builder $builder
+     * @return array<static>
      */
-    final public static function query(): static
-    {
-        $static = new static();
-        $static->queryIsInit = true;
+    abstract static function get(Builder $builder): array;
 
-        return $static;
+    /**
+     * Количество элементов
+     * @param Builder $builder
+     * @return int
+     */
+    abstract public static function count(Builder $builder): int;
+
+    /**
+     * @return mixed
+     */
+    abstract public function element(): mixed;
+
+    /**
+     * Инициализация запроса
+     * @return Builder
+     */
+    final public static function query(): Builder
+    {
+        return new Builder(new static());
+    }
+
+    /**
+     * Добавление элементов
+     * @param array $data
+     * @return Result[]
+     */
+    final public static function insert(array $data): array
+    {
+        if (! array_is_list($data)) {
+            $data = [$data];
+        }
+        $result = [];
+        foreach ($data as $item) {
+            $model = new static();
+            $model->fill($item);
+            $result[] = $model->save();
+        }
+
+        return $result;
+    }
+
+    /**
+     * Добавление элемента
+     * @param array $data
+     * @return Result
+     */
+    final public static function add(array $data): Result
+    {
+        $model = new static();
+        $model->fill($data);
+        return $model->save();
+    }
+
+    /**
+     * Результат запроса в виде массива
+     * @param Builder $builder
+     * @return array<static>
+     */
+    public static function getArray(Builder $builder): array
+    {
+        $result = [];
+        foreach (static::get($builder) as $element) {
+            $result[] = $element->toArray();
+        }
+        return $result;
     }
 
     /**
@@ -130,91 +140,6 @@ abstract class BaseModel
     }
 
     /**
-     * Первый элемент запроса
-     * @return $this|null
-     */
-    public function first(): ?static
-    {
-        // Если объект уже создан, вернем его же
-        if ($this->element()) {
-            return $this;
-        }
-        $elements = $this->get(1);
-
-        return $elements ? $elements[0] : null;
-    }
-
-    /**
-     * Первый элемент запроса массивом
-     * @return array|null
-     */
-    public function firstArray(): ?array
-    {
-        return $this->first()?->toArray();
-
-    }
-
-    /**
-     * Проверка существования элемента
-     * @return bool
-     */
-    public function exists(): bool
-    {
-        return null !== $this->element();
-    }
-
-    /**
-     * @return ElementV2|ElementV1|EntityObject|null
-     */
-    public function element(): ElementV2|ElementV1|EntityObject|null
-    {
-        return null;
-    }
-
-    /**
-     * Результат запроса
-     * @param int|null $limit
-     * @param int|null $offset
-     * @return array<static>
-     */
-    public function get(?int $limit = null, ?int $offset = null): array
-    {
-        return [];
-    }
-
-    /**
-     * Результат запроса в виде массива
-     * @param int|null $limit
-     * @param int|null $offset
-     * @return array<static>
-     */
-    public function getArray(?int $limit = null, ?int $offset = null): array
-    {
-        $result = [];
-        foreach ($this->get($limit, $offset) as $element) {
-            $result[] = $element->toArray();
-        }
-
-        return $result;
-    }
-
-    /**
-     * Установка пагинации
-     * @param int $page
-     * @param int $itemsPerPage
-     * @return $this
-     */
-    public function paginate(int $page = 1, int $itemsPerPage = 20): static
-    {
-        $offset = 0;
-        if ($page > 1) {
-            $offset = ($page - 1) * $itemsPerPage;
-        }
-
-        return $this->setOffset($offset)->setLimit($itemsPerPage);
-    }
-
-    /**
      * Актуализировать элемент из БД
      * @return $this
      */
@@ -225,10 +150,12 @@ abstract class BaseModel
             return $this;
         }
 
-        return $this
-            ->setFilter([
-                '=' . $this->primary => $this->{$this->primary}
-            ])
+        return $this::query()
+            ->setFilter(
+                [
+                    '=' . $this->primary => $this->{$this->primary}
+                ]
+            )
             ->first();
     }
 
@@ -252,27 +179,29 @@ abstract class BaseModel
     }
 
     /**
-     * Магические методы.
-     * whereColumn(value) - построитель фильтра
-     * @param string $name
-     * @param array $arguments
-     * @return $this|null
+     * Получить primary ключ
+     * @return string|null
      */
-    public function __call(string $name, array $arguments)
+    public function getPrimaryKey(): ?string
     {
-        // Построитель поиска
-        if (preg_match('/where([a-z])/i', $name)) {
-            $field = strtoupper(Helper::camelToSnakeCase(str_replace('where', '', $name)));
-            $operator = $arguments[1] ?? '=';
+        return $this->primary ? ($this->{$this->primary} ?? null) : null;
+    }
 
-            return $this->where(
-                $field,
-                $operator,
-                $arguments[0]
-            );
-        }
+    /**
+     * Получить primary
+     * @return string|int|null
+     */
+    public function getPrimary(): string|int|null
+    {
+        return $this->getPrimaryKey() ? ($this->{$this->getPrimaryKey()} ?? null) : null;
+    }
 
-        return null;
+    /**
+     * @return bool
+     */
+    public function exists(): bool
+    {
+        return null !== $this->element();
     }
 
     /**
@@ -295,6 +224,120 @@ abstract class BaseModel
     }
 
     /**
+     * Обновление/сохранение элементов
+     * @return Result
+     */
+    public function save(): Result
+    {
+        $data = $this->getChangedProperties();
+        if (! $data) {
+            return new Result();
+        }
+        // Обновление текущего элемента
+        if ($this->element()) {
+            $this->onBeforeUpdate();
+            array_walk($data, function ($value, $field) {
+                $this->element()->set($field, $value);
+            });
+            try {
+                $update = $this->element()->save();
+            } catch (Exception $e) {
+                $update = new Result();
+                $update->setData($data);
+                $update->addError(Error::createFromThrowable($e));
+            }
+            $this->onAfterUpdate($update);
+
+            return $update;
+        }
+        /**
+         * Добавление нового элемента
+         * @var CommonElementTable|DataManager $entity
+         */
+        $this->onBeforeAdd();
+        try {
+            $result = $this::getEntity()::add($data);
+        } catch (Exception $e) {
+            $result = new Result();
+            $result->setData($data);
+            $result->addError(Error::createFromThrowable($e));
+        }
+        $this->onAfterAdd($result);
+
+        return $result;
+    }
+
+    /**
+     * Обновление текущего элемента. Старый метод
+     * @param array $data
+     * @return bool
+     * @deprecated
+     */
+    public function elementUpdate(array $data): bool
+    {
+        return $this->update($data)->isSuccess();
+    }
+
+    /**
+     * Обновление элемента модели или элементов запроса.
+     * @param array $data
+     * @return Result
+     */
+    public function update(array $data): Result
+    {
+        if (! $this->exists()) {
+            return new Result();
+        }
+        return $this->fill($data)->save();
+    }
+
+    /**
+     * Сохранение элемента и его получение
+     * @return $this
+     */
+    public function put(): static
+    {
+        $save = $this->save();
+        if (! $save->isSuccess()) {
+            return $this;
+        }
+        $primary = $this->getProperty($this->primary) ?: $save->getId();
+        $this->{$this->primary} = $primary;
+
+        return $this->refresh();
+    }
+
+    /**
+     * Удаление элемента модели
+     * @return Result
+     */
+    public function delete(): Result
+    {
+        if (! $this->exists()) {
+            return new Result();
+        }
+        $this->onBeforeDelete();
+        try {
+            $result = $this->element()->delete();
+        } catch (\Exception $e) {
+            $result = new Result();
+            $result->addError(Error::createFromThrowable($e));
+        }
+        $this->onAfterDelete($result);
+        return $result;
+    }
+
+    /**
+     * Удаление текущего элемента. Старый метод
+     * @return bool
+     * @deprecated
+     */
+    public function elementDelete(): bool
+    {
+        return $this->delete()->isSuccess();
+    }
+
+    /**
      * Свойства модели при ее инициализации
      * @return array
      */
@@ -304,12 +347,30 @@ abstract class BaseModel
     }
 
     /**
+     * Получить статические свойства
+     * @return array
+     */
+    public function getStaticProperties(): array
+    {
+        $properties = [];
+        // DETAIL_PAGE_URL вычисляемое значение для инфоблока
+        if ($this instanceof IModel) {
+            $properties[] = 'DETAIL_PAGE_URL';
+        }
+        return $properties;
+    }
+
+    /**
      * Измененные свойства
      * @return array
      */
     public function getChangedProperties(): array
     {
-        return array_diff_assoc($this->properties, $this->originalProperties);
+        $staticProperties = $this->getStaticProperties();
+        return array_diff_key(
+            array_diff_assoc($this->properties, $this->originalProperties),
+            array_combine($staticProperties, array_fill(0, count($staticProperties), null))
+        );
     }
 
     /**

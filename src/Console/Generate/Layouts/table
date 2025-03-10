@@ -3,12 +3,16 @@
 namespace #NAMESPACE#;
 
 use Pago\Bitrix\Models\TableModel;
+use Pago\Bitrix\Models\Queries\Builder;
 use Bitrix\Main\Type\DateTime;
 use Bitrix\Main\Type\Date;
 
 /**
  * Таблица - #TABLE_NAME#
 #PROPERTIES#
+ * @method static Builder|$this query()
+ * @method Builder|$this get()
+ * @method Builder|$this first()
 #METHODS#
  */
 class #NAME# extends TableModel

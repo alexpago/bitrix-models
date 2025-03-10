@@ -17,7 +17,7 @@ class Iblock extends Base
     /**
      * @var string
      */
-    private string $layoutMethodProperty = '@method %s get%s() // %s';
+    private string $layoutMethodProperty = '@method %s Builder|$this get%s() // %s';
 
     /**
      * @var IblockTable

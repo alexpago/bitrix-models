@@ -47,37 +47,30 @@ final class TableModelQuery
      * @param bool $cacheJoin
      * @return TableModel[]
      */
-    public function fetch(
-        array $filter = [],
-        array $select = ['*'],
-        array $order = [],
-        int $limit = 999_999_999_999,
-        int $offset = 0,
-        int $cacheTtl = 0,
-        bool $cacheJoin = false
-    ): array {
+    public function fetch(Builder $builder): array
+    {
         /**
          * @var TableModel $model
          */
         $model = new $this->model();
         $data = [];
         $cache = [];
-        if ($cacheTtl > 0) {
+        if ($builder->cacheTtl > 0) {
             $cache = [
                 'cache' => [
-                    'ttl' => $cacheTtl,
-                    'cache_joins' => $cacheJoin
+                    'ttl' => $builder->cacheTtl,
+                    'cache_joins' => $builder->cacheJoin
                 ]
             ];
         }
         $query = $this->getEntityClass()::getList(
             array_merge(
                 [
-                    'filter' => $filter,
-                    'select' => $select,
-                    'order' => $order,
-                    'limit' => $limit,
-                    'offset' => $offset
+                    'filter' => $builder->getFilter(),
+                    'select' => $builder->getSelect(),
+                    'order' => $builder->getOrder(),
+                    'limit' => $builder->getLimit(),
+                    'offset' => $builder->getOffset(),
                 ],
                 $cache
             )
@@ -87,8 +80,7 @@ final class TableModelQuery
              * @var EntityObject $element
              * @var TableModel $model
              */
-            $model = clone $model;
-            $data[] = $model->setElement($element);
+            $data[] = $model->setElement(clone $model, $element);
         }
 
         return $data;
@@ -109,14 +101,13 @@ final class TableModelQuery
 
     /**
      * Фасет GetCount
-     * @param array $filter
+     * @param Builder $builder
      * @return int
      * @see DataManager::getCount()
      */
-    public function count(array $filter = []): int {
-        $entity = $this->getEntityClass();
-
-        return $entity::getCount($filter);
+    public function count(Builder $builder): int
+    {
+        return $this->getEntityClass()::getCount($builder->getFilter());
     }
 
     /**

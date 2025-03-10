@@ -3,7 +3,6 @@ declare(strict_types=1);
 
 namespace Pago\Bitrix\Models\Console\Generate\Models;
 
-use Bitrix\Highloadblock\HighloadBlockTable;
 use Bitrix\Main\SystemException;
 use Pago\Bitrix\Models\Console\Generate\GenerateResult;
 use Pago\Bitrix\Models\Helpers\Helper;

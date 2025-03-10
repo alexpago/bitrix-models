@@ -3,12 +3,16 @@
 namespace #NAMESPACE#;
 
 use Pago\Bitrix\Models\IModel;
+use Pago\Bitrix\Models\Queries\Builder;
 use Bitrix\Iblock\ORM\ValueStorage;
 use Bitrix\Main\ORM\Objectify\Collection;
 
 /**
  * Для вызова методов getProperty и получения значения используйте метод getValue()
 #PROPERTIES#
+ * @method static Builder|$this query()
+ * @method Builder|$this get()
+ * @method Builder|$this first()
 #METHODS#
  */
 class #NAME# extends IModel

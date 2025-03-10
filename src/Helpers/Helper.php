@@ -59,11 +59,11 @@ final class Helper
     /**
      * Получить цифры из строки
      * @param  string  $input
-     * @return string
+     * @return int
      */
-    public static function getOnlyNumeric(string $input): string
+    public static function getOnlyNumeric(string $input): int
     {
-        return preg_replace('/[^0-9]+/i', '', $input);
+        return (int)preg_replace('/[^0-9]+/i', '', $input);
     }
 
     /**
