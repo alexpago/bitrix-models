@@ -2,9 +2,11 @@
 
 namespace Pago\Bitrix\Models\Queries;
 
-use Bitrix\Iblock\ElementTable;
+use Bitrix\Main\ORM\Data\Result;
 use Pago\Bitrix\Models\BaseModel;
+use Pago\Bitrix\Models\Cache\CacheService;
 use Pago\Bitrix\Models\Helpers\Helper;
+use Pago\Bitrix\Models\Helpers\IModelHelper;
 use Pago\Bitrix\Models\IModel;
 use Pago\Bitrix\Models\Traits\ModelBaseTrait;
 use Pago\Bitrix\Models\Traits\ModelActionTrait;
@@ -79,6 +81,35 @@ final class Builder
     }
 
     /**
+     * Получить модель
+     * @return BaseModel
+     */
+    public function getModel(): BaseModel
+    {
+        return $this->model;
+    }
+
+    /**
+     * Добавление элементов
+     * @param array $data
+     * @return array
+     */
+    public function insert(array $data): array
+    {
+        return $this->model::insert($data);
+    }
+
+    /**
+     * Добавление элемента
+     * @param array $data
+     * @return Result
+     */
+    public function add(array $data): Result
+    {
+        return $this->model::add($data);
+    }
+
+    /**
      * Получить список элементов
      * @param int|null $limit
      * @param int|null $offset
@@ -92,6 +123,7 @@ final class Builder
         if (null !== $offset) {
             $this->offset($offset);
         }
+
         return $this->model::get($this);
     }
 
@@ -163,7 +195,7 @@ final class Builder
         if (preg_match('/where([a-z])/i', $name)) {
             $field = strtoupper(Helper::camelToSnakeCase(str_replace('where', '', $name)));
             // Если это свойство инфоблока, то добавим VALUE для источника поиска
-            if ($this->isIblockModel() && ! $this->isIblockBaseField($field)) {
+            if ($this->isIblockModel() && ! IModelHelper::isBaseField($field)) {
                 $field .= '.VALUE';
             }
             $operator = $arguments[1] ?? '=';
@@ -205,7 +237,7 @@ final class Builder
     {
         if (
             $this->isIblockModel()
-            && ! $this->isIblockBaseField($property)
+            && ! IModelHelper::isBaseField($property)
             && ! str_contains($property, '.')
         ) {
             $property .= '.VALUE';
@@ -221,17 +253,5 @@ final class Builder
     protected function isIblockModel(): bool
     {
         return $this->model instanceof IModel;
-    }
-
-    /**
-     * Поле является базовым инфоблока
-     * @param string $field
-     * @return bool
-     */
-    protected function isIblockBaseField(string $field): bool
-    {
-        return in_array(strtoupper($field), array_keys(
-            (new ElementTable())->getEntity()->getFields()
-        ));
     }
 }

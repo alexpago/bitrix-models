@@ -3,12 +3,14 @@ declare(strict_types=1);
 
 namespace Pago\Bitrix\Models\Queries;
 
+use Bitrix\Main\SystemException;
 use CIBlockElement;
 use Bitrix\Iblock\ORM\CommonElementTable;
 use Bitrix\Iblock\ORM\ElementV1;
 use Bitrix\Iblock\ORM\ElementV2;
 use Bitrix\Main\ORM\Objectify\EntityObject;
 use Bitrix\Main\ORM\Query\Result as QueryResult;
+use Pago\Bitrix\Models\Cache\CacheService;
 use Pago\Bitrix\Models\Helpers\Helper;
 use Pago\Bitrix\Models\Helpers\IModelHelper;
 use Pago\Bitrix\Models\IModel;
@@ -25,10 +27,9 @@ final class IModelQuery
     private string $model;
 
     /**
-     * Стандартный select
-     * @var array|string[]
+     * @var CommonElementTable
      */
-    private array $defaultSelect = ['*'];
+    private CommonElementTable $modelEntity;
 
     /**
      * @param string $model Класс модели
@@ -37,6 +38,11 @@ final class IModelQuery
     {
         $this->model = $model;
         Helper::includeBaseModules();
+        $model = new $model();
+        if (! $model instanceof IModel) {
+            throw new SystemException('IModelQuery must be instance of IModel');
+        }
+        $this->modelEntity = $model::getEntity();
     }
 
     /**
@@ -55,10 +61,6 @@ final class IModelQuery
      */
     public function fetch(Builder $builder): array
     {
-        /**
-         * @var IModel $model
-         */
-        $model = new $this->model();
         $data = [];
         $cache = [];
         if ($builder->cacheTtl > 0) {
@@ -75,17 +77,16 @@ final class IModelQuery
          */
         $elements = [];
         $elementIds = [];
-        $query = $this->getEntityClass($model)::getList(
+        /**
+         * В первом запросе мы забираем только системные поля, без свойств
+         */
+        $query = $this->modelEntity::getList(
             array_merge(
                 [
                     'filter' => $builder->getFilter(),
-                    'select' => $this->select(
-                        $model,
-                        $builder->getSelect(),
-                        $builder->withProperties
-                    ),
-                    'order'  => $builder->getOrder(),
-                    'limit'  => $builder->getLimit(),
+                    'select' => $this->collectBaseFields($builder->getSelect()),
+                    'order' => $builder->getOrder(),
+                    'limit' => $builder->getLimit(),
                     'offset' => $builder->getOffset(),
                 ],
                 $cache
@@ -99,24 +100,44 @@ final class IModelQuery
             $elementIds[] = $element->getId();
         }
 
+        // Загрузка свойств
+        $properties = [];
+        if ($builder->withProperties) {
+            $properties = $this->getProperties(
+                $builder,
+                $elementIds,
+                $builder->getSelect()
+            );
+        }
+
         // Загрузка детальных ссылок элементов
         $detailPageUrls = [];
         if ($builder->withDetailPageUrl) {
-            $detailPageUrls = $this->getDetailPageUrl($elementIds);
+            $detailPageUrls = $this->getDetailPageUrl($builder, $elementIds);
         }
+
+        // Создадим модель для каждого элемента
         foreach ($elements as $element) {
             /**
              * @var ElementV1|ElementV2 $element
              * @var IModel $model
              */
-            $model = clone $model;
+            $model = new $this->model();
             $model = $model::setElement($model, $element, $builder);
-            if ($builder->withDetailPageUrl) {
-                $model->detailPageUrl = $detailPageUrls[(int)$element->getId()];
+
+            // Детальная страница элемента
+            if (! empty($detailPageUrls[$model->ID])) {
+                $model->detailPageUrl = $detailPageUrls[$model->ID];
                 $model->fill([
-                    'DETAIL_PAGE_URL' => $detailPageUrls[(int)$element->getId()]
+                    'DETAIL_PAGE_URL' => $detailPageUrls[$model->ID]
                 ]);
             }
+
+            // Свойства
+            if (is_array($properties[$model->ID] ?? null)) {
+                $model->fill($properties[$model->ID]);
+            }
+
             $data[] = $model;
         }
 
@@ -131,9 +152,7 @@ final class IModelQuery
      */
     public function getList(array $parameters = []): QueryResult
     {
-        $entity = $this->getEntityClass();
-
-        return $entity::getList($parameters);
+        return $this->modelEntity::getList($parameters);
     }
 
     /**
@@ -142,26 +161,102 @@ final class IModelQuery
      * @return int
      * @see CommonElementTable::getCount()
      */
-    public function count(Builder $builder): int {
-        return $this->getEntityClass()::getCount($builder->getFilter());
+    public function count(Builder $builder): int
+    {
+        return $this->modelEntity::getCount($builder->getFilter());
+    }
+
+    /**
+     * Получить свойства элемента через GetPropertyValuesArray
+     * @param Builder $builder
+     * @param IModel|int|array $elements
+     * @param array $select
+     * @return array
+     */
+    public function getProperties(
+        Builder          $builder,
+        IModel|int|array $elements,
+        array            $select = []
+    ): array
+    {
+        $iblockId = $builder->getModel()->getIblockId();
+        // Соберем список идентификаторов элементов
+        $elementIds = [];
+        $elements = (array)$elements;
+        if (array_is_list($elements)) {
+            foreach ($elements as $element) {
+                if (is_int($element)) {
+                    $elementIds[] = $element;
+                } elseif ($element instanceof IModel && $element->ID) {
+                    $elementIds[] = $element->ID;
+                }
+            }
+        }
+        $elementIds = array_unique(array_filter($elementIds));
+        if (! $elementIds) {
+            return [];
+        }
+        // Проверка наличия кэша свойств
+        $cacheKey = md5(serialize($elementIds)) . '-properties';
+        $cache = CacheService::instance()->getIblockCache(
+            iblockId: $iblockId,
+            cacheKey: $cacheKey,
+            ttl: $builder->cacheTtl
+        );
+        if (null !== $cache) {
+            return $cache;
+        }
+        // Собираем массив свойств
+        $data = [];
+        CIBlockElement::GetPropertyValuesArray(
+            result: $data,
+            iblockID: $iblockId,
+            filter: [
+                'ID' => $elementIds
+            ],
+            propertyFilter: [
+                'CODE' => $this->collectPropertyFields($iblockId, $select)
+            ]
+        );
+        // Запишем в кэш
+        if ($builder->withProperties && $data) {
+            CacheService::instance()->setIblockCache(
+                iblockId: $iblockId,
+                cacheKey: $cacheKey,
+                data: $data,
+                ttl: $builder->cacheTtl
+            );
+        }
+
+        return $data;
     }
 
     /**
      * Получение детальной страницы URL
+     * @param Builder $builder
      * @param int|array $elementId
      * @return array<string>
+     * @throws SystemException
      */
-    public function getDetailPageUrl(int|array $elementId): array
+    public function getDetailPageUrl(Builder $builder, int|array $elementId): array
     {
+        $iblockId = $builder->getModel()->getIblockId();
+        $elementIds = (array)$elementId;
+        // Проверка наличия кэша свойств
+        $cacheKey = md5(serialize($elementIds)) . '-detail-page-url';
+        $cache = CacheService::instance()->getIblockCache(
+            iblockId: $iblockId,
+            cacheKey: $cacheKey,
+            ttl: $builder->cacheTtl
+        );
+        if (null !== $cache) {
+            return $cache;
+        }
+        // Получение данных
         $data = [];
-        /**
-         * @var IModel $model
-         */
-        $model = new $this->model();
         $elements = CIBlockElement::getList(
             arFilter: [
-                '=ID' => $elementId,
-                '=IBLOCK_ID' => $model::iblockId()
+                '=ID' => $elementIds,
             ],
             arSelectFields: [
                 'ID',
@@ -171,43 +266,44 @@ final class IModelQuery
         while ($element = $elements->GetNext()) {
             $data[(int)$element['ID']] = $element['DETAIL_PAGE_URL'];
         }
+        // Запишем в кэш
+        if ($builder->withProperties && $data) {
+            CacheService::instance()->setIblockCache(
+                iblockId: $iblockId,
+                cacheKey: $cacheKey,
+                data: $data,
+                ttl: $builder->cacheTtl
+            );
+        }
 
         return $data;
     }
 
     /**
-     * Построитель select
-     * @param IModel $model
+     * Выбрать только системные свойства
      * @param array $select
-     * @param bool $includeProperties
      * @return array
      */
-    private function select(IModel $model, array $select, bool $includeProperties): array
+    private function collectBaseFields(array $select): array
     {
-        if (! $select) {
-            $select = $this->defaultSelect;
+        if (in_array('*', $select)) {
+            return $select;
         }
-        if ($includeProperties) {
-            $select = array_merge(
-                $this->defaultSelect,
-                IModelHelper::getIblockPropertyCodes($model::iblockId())
-            );
-        }
-
-        return array_unique($select);
+        return array_intersect_key($select, array_flip(IModel::getBaseFields()));
     }
 
     /**
-     * Получение экземпляра класса
-     * @param IModel|null $model
-     * @return CommonElementTable
+     * Получить только свойства инфоблока
+     * @param int $iblockId
+     * @param array $select
+     * @return array
      */
-    private function getEntityClass(?IModel $model = null): CommonElementTable
+    private function collectPropertyFields(int $iblockId, array $select): array
     {
-        if (null === $model) {
-            $model = new $this->model();
+        $iblockProperties = IModelHelper::getIblockPropertyCodes($iblockId);
+        if (in_array('*', $select)) {
+            return $iblockProperties;
         }
-
-        return $model::getEntity();
+        return array_intersect_key($select, array_flip($iblockProperties));
     }
 }

@@ -75,13 +75,21 @@ abstract class HlModel extends BaseModel
         }
         // По символьному коду
         if (static::HL_CODE) {
-            return HlModelHelper::getHlIdByCode((string)static::HL_CODE);
+            $hlId = HlModelHelper::getHlIdByCode((string)static::HL_CODE);
+            if (! $hlId) {
+                throw new SystemException(sprintf('Highload блок с кодом %s не найден', static::HL_CODE));
+            }
+            return $hlId;
         }
 
         $class = explode('\\', static::class);
         $class = end($class);
+        $hlId = HlModelHelper::getHlIdByCode($class);
+        if (! $hlId) {
+            throw new SystemException(sprintf('Highload блок с кодом %s не найден', static::HL_CODE));
+        }
 
-        return HlModelHelper::getHlIdByCode($class);
+        return $hlId;
     }
 
     /**

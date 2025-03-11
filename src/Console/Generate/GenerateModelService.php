@@ -10,6 +10,7 @@ use Pago\Bitrix\Models\Console\Generate\Models\Table;
 use Pago\Bitrix\Models\Console\Traits\ConsoleBaseMethods;
 use Pago\Bitrix\Models\Console\Traits\ConsoleMessage;
 use Pago\Bitrix\Models\Helpers\Helper;
+use Pago\Bitrix\Models\Helpers\HlModelHelper;
 use Pago\Bitrix\Models\Helpers\TableModelHelper;
 use Pago\Bitrix\Models\Models\HlblockTable;
 use Pago\Bitrix\Models\Models\IblockTable;
@@ -52,18 +53,24 @@ final class GenerateModelService
         // Считываем метод переданный при вызове (тип генерации модели)
         $this->method = $this->getMethodFromInputArguments($arguments);
 
+        // Переданные идентификаторы в аргументах
+        $elements = null;
+        if (count($this->arguments) > 1) {
+            $elements = array_slice(array_keys($this->arguments), 1);
+        }
+
         match (is_string($this->method) ? strtolower($this->method) : null) {
             // Генерация инфоблоков
-            'iblock', 'ib' => call_user_func(function () {
-                $this->generateIModel();
+            'iblock', 'ib' => call_user_func(function () use ($elements) {
+                $this->generateIModel($elements);
             }),
             // Генерация highload блоков
-            'hlblock', 'highloadblock', 'hb', 'hl' => call_user_func(function () {
-                $this->generateHlModel();
+            'hlblock', 'highloadblock', 'hb', 'hl' => call_user_func(function () use ($elements) {
+                $this->generateHlModel($elements);
             }),
             // Генерация таблиц
-            'table' => call_user_func(function () {
-                $this->generateTableModel();
+            'table' => call_user_func(function () use ($elements) {
+                $this->generateTableModel($elements);
             }),
             default => call_user_func(function () {
                 $this->hello();
@@ -84,20 +91,23 @@ final class GenerateModelService
 
     /**
      * Генерация таблиц
+     * @param array|null $inputNames
      * @return void
      * @throws SystemException
      */
-    public function generateTableModel(): void
+    public function generateTableModel(array|null $inputNames = null): void
     {
-        $message = 'Введите название таблицы через пробел для генерации модели.' . PHP_EOL;
-        $message .= 'Для выхода введите "q".';
+        if (! $inputNames) {
+            $message = 'Введите название таблицы через пробел для генерации модели.' . PHP_EOL;
+            $message .= 'Для выхода введите "q".';
 
-        $this->info($message);
-        $input = explode(' ', strtolower($this->question('Ввод')));
+            $this->info($message);
+            $inputNames = explode(' ', strtolower($this->question('Ввод')));
+        }
 
         // Вывод всех таблиц для выбора
-        foreach ($input as $tableName) {
-            if (!$tableName) {
+        foreach ($inputNames as $tableName) {
+            if (! $tableName) {
                 continue;
             }
             if (!TableModelHelper::instance()->checkTableExists($tableName)) {
@@ -123,27 +133,31 @@ final class GenerateModelService
 
     /**
      * Генерация highload
+     * @param array|null $inputIds
      * @return void
      * @throws SystemException
      */
-    public function generateHlModel(): void
+    public function generateHlModel(array|null $inputIds = null): void
     {
         $hls = HlblockTable::query()->get();
-        $message = 'Введите идентификаторы highload блоков через пробел для генерации модели.' . PHP_EOL;
-        $message .= 'или all для всех. Для выхода введите "q".';
 
-        // Вывод всех справочников для выбора
-        $this->info($message);
-        foreach ($hls as $hl) {
-            $this->info(sprintf(
-                '%d - %s, TABLE_NAME: %s',
-                $hl->ID,
-                $hl->NAME,
-                $hl->TABLE_NAME
-            ));
-        }
         // Запрашиваем ID или all если нужно создать для всех
-        $inputIds = explode(' ', strtolower($this->question('Ввод')));
+        if (! $inputIds) {
+            $message = 'Введите идентификаторы highload блоков через пробел для генерации модели.' . PHP_EOL;
+            $message .= 'или all для всех. Для выхода введите "q".';
+
+            // Вывод всех справочников для выбора
+            $this->info($message);
+            foreach ($hls as $hl) {
+                $this->info(sprintf(
+                    '%d - %s, TABLE_NAME: %s',
+                    $hl->ID,
+                    $hl->NAME,
+                    $hl->TABLE_NAME
+                ));
+            }
+            $inputIds = explode(' ', strtolower($this->question('Ввод')));
+        }
         if ($inputIds && in_array('all', $inputIds)) {
             $inputIds = array_map(function (HlblockTable $hls) {
                 return $hls->ID;
@@ -153,6 +167,11 @@ final class GenerateModelService
         foreach ($inputIds as $hlId) {
             $hlId = (int)$hlId;
             if (! $hlId) {
+                continue;
+            }
+            // Проверка существования HL
+            if (! HlModelHelper::getHlCodeById($hlId)) {
+                $this->warning(sprintf('Справочник %d не найден', $hlId));
                 continue;
             }
             $generateModel = new HlBlock(
@@ -172,32 +191,36 @@ final class GenerateModelService
 
     /**
      * Генерация инфоблоков
+     * @param array|null $inputIds
      * @return void
      * @throws SystemException
      */
-    public function generateIModel(): void
+    public function generateIModel(array|null $inputIds = null): void
     {
         $iblocks = IblockTable::query()->get();
-        $message = 'Введите идентификаторы инфоблоков через пробел для генерации модели.' . PHP_EOL;
-        $message .= 'или all для всех. Для выхода введите "q".';
-        $this->info($message);
-
-        // Вывод всех инфоблоков для выбора
-        foreach ($iblocks as $iblock) {
-            $this->info(sprintf(
-                '%d - %s CODE: %s, API_CODE: %s',
-                $iblock->ID,
-                $iblock->NAME,
-                $iblock->CODE ?: '-',
-                $iblock->API_CODE ?: '-'
-            ));
-
-            if (! $iblock->CODE) {
-                $this->warning('WARNING: Не заполнен символьный код. Рекомендуется указать его');
-            }
-        }
         // Запрашиваем ID или all если нужно создать для всех
-        $inputIds = explode(' ', strtolower($this->question('Ввод')));
+        if (! $inputIds) {
+            $message = 'Введите идентификаторы инфоблоков через пробел для генерации модели.' . PHP_EOL;
+            $message .= 'или all для всех. Для выхода введите "q".';
+            $this->info($message);
+
+            // Вывод всех инфоблоков для выбора
+            foreach ($iblocks as $iblock) {
+                $this->info(sprintf(
+                    '%d - %s CODE: %s, API_CODE: %s',
+                    $iblock->ID,
+                    $iblock->NAME,
+                    $iblock->CODE ?: '-',
+                    $iblock->API_CODE ?: '-'
+                ));
+
+                if (! $iblock->CODE) {
+                    $this->warning('WARNING: Не заполнен символьный код. Рекомендуется указать его');
+                }
+            }
+
+            $inputIds = explode(' ', strtolower($this->question('Ввод')));
+        }
         if ($inputIds && in_array('all', $inputIds)) {
             $inputIds = array_map(function (IblockTable $iblock) {
                 return $iblock->ID;

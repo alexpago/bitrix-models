@@ -18,6 +18,11 @@
             "src/include.php"
         ]
     },
+    "autoload-dev": {
+        "psr-4": {
+            "Pago\\Bitrix\\Tests\\": "tests/"
+        }
+    },
     "authors": [
         {
             "name": "Alex Pago",
@@ -26,5 +31,8 @@
     ],
     "require": {
         "php": ">=8.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^12.0"
     }
 }

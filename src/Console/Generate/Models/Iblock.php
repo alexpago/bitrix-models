@@ -15,11 +15,6 @@ use Pago\Bitrix\Models\Models\IblockTable;
 class Iblock extends Base
 {
     /**
-     * @var string
-     */
-    private string $layoutMethodProperty = '@method %s Builder|$this get%s() // %s';
-
-    /**
      * @var IblockTable
      */
     private IblockTable $iblock;
@@ -63,20 +58,13 @@ class Iblock extends Base
         $model = str_replace('#NAME#', $data->name, $model);
 
         // Генерация документации
-        $properties = $propertyMethods = $methods = '';
+        $properties =  $methods = '';
         foreach (IModelHelper::getIblockProperties($this->id) as $property) {
             $code = Helper::snakeToCamelCase($property['CODE'], true);
             if ('' !== $properties) {
-                $propertyMethods .= PHP_EOL;
                 $properties .= PHP_EOL;
                 $methods .= PHP_EOL;
             }
-            $propertyMethods .= ' * ' . sprintf(
-                    $this->layoutMethodProperty,
-                    $this->getMethodPropertyReturnType($property['PROPERTY_TYPE'], $property['MULTIPLE'] === 'Y'),
-                    $code,
-                    ucfirst($property['NAME'])
-                );
             $properties .= ' * ' . sprintf(
                     $this->layoutProperty,
                     $this->getPropertyReturnType($property['PROPERTY_TYPE'], $property['MULTIPLE'] === 'Y'),
@@ -91,7 +79,7 @@ class Iblock extends Base
                 );
         }
 
-        $model = str_replace('#PROPERTIES#', $propertyMethods . $properties, $model);
+        $model = str_replace('#PROPERTIES#', $properties, $model);
         $model = str_replace('#METHODS#', $methods, $model);
         $data->success = $this->createModelFile($data->path, $model);
 
@@ -113,11 +101,11 @@ class Iblock extends Base
             $code = 'iblock' . $this->iblock->ID;
         }
 
-        return $this->iblock->elementUpdate([
+        return $this->iblock->update([
             'API_CODE' => Helper::getOnlyAlphaNumeric(
                 Helper::snakeToCamelCase($code, true)
             ),
-        ]);
+        ])->isSuccess();
     }
 
     /**
@@ -163,16 +151,5 @@ class Iblock extends Base
             name: $name,
             warnings: $warnings
         );
-    }
-
-    /**
-     * Возвращаемый тип свойства полученным через метод
-     * @param  string  $type
-     * @param  bool  $multiple
-     * @return string
-     */
-    private function getMethodPropertyReturnType(string $type, bool $multiple): string
-    {
-        return $multiple ? 'Collection' : 'ValueStorage';
     }
 }

@@ -9,7 +9,9 @@ use Bitrix\Main\DB\Exception;
 use Bitrix\Main\Error;
 use Bitrix\Main\ORM\Data\Result;
 use Pago\Bitrix\Models\Helpers\DynamicTable;
+use Pago\Bitrix\Models\Helpers\IModelHelper;
 use Pago\Bitrix\Models\Queries\Builder;
+use CIBlockElement;
 
 /**
  * Базовый класс моделей
@@ -149,14 +151,15 @@ abstract class BaseModel
         if (! $this->{$this->primary}) {
             return $this;
         }
-
-        return $this::query()
-            ->setFilter(
-                [
-                    '=' . $this->primary => $this->{$this->primary}
-                ]
-            )
+        $element = $this::query()
+            ->withProperties()
+            ->where($this->primary, '=', $this->{$this->primary})
             ->first();
+        if ($element) {
+            $this->fill($element->toArray());
+        }
+
+        return $this;
     }
 
     /**
@@ -184,7 +187,7 @@ abstract class BaseModel
      */
     public function getPrimaryKey(): ?string
     {
-        return $this->primary ? ($this->{$this->primary} ?? null) : null;
+        return $this->primary;
     }
 
     /**
@@ -233,12 +236,32 @@ abstract class BaseModel
         if (! $data) {
             return new Result();
         }
+        $isIblockModel = $this instanceof IModel;
+        $iblockId = $isIblockModel ? $this::iblockId() : 0;
         // Обновление текущего элемента
         if ($this->element()) {
             $this->onBeforeUpdate();
-            array_walk($data, function ($value, $field) {
-                $this->element()->set($field, $value);
-            });
+            // Свойства инфоблока запишем и сохраним отдельно
+            $iblockProperties = [];
+            foreach ($data as $property => $value) {
+                // Инфоблок обработаем иначе
+                if ($isIblockModel) {
+                    // Базовое поле сохраним обычно
+                    if (IModelHelper::isBaseField($property)) {
+                        $this->element()->set($property, $value);
+                    } elseif(IModelHelper::isProperty($iblockId, $property)) {
+                        // Свойство инфоблока
+                        $iblockProperties[$property] = $value;
+                    }
+                    continue;
+                }
+                // Обычное поле справочника или таблицы
+                $this->element()->set($property, $value);
+            }
+            // Сохраним свойства инфоблока
+            if ($iblockProperties) {
+                \CIBlockElement::SetPropertyValuesEx($this->ID, false, $iblockProperties);
+            }
             try {
                 $update = $this->element()->save();
             } catch (Exception $e) {
@@ -250,13 +273,27 @@ abstract class BaseModel
 
             return $update;
         }
+
         /**
          * Добавление нового элемента
          * @var CommonElementTable|DataManager $entity
          */
         $this->onBeforeAdd();
         try {
-            $result = $this::getEntity()::add($data);
+            $addData = $data;
+            // Для инфоблока добавим сначала поля инфоблока, потом свойства
+            if ($isIblockModel) {
+                $addData = array_intersect_key($addData, array_flip(IModel::getBaseFields()));
+            }
+            $result = $this::getEntity()::add($addData);
+            // Для инфоблока нужно добавить свойства повторно
+            if ($isIblockModel && $result->isSuccess()) {
+                $element = $this::query()
+                    ->where($this->getPrimaryKey(), $result->getId())
+                    ->withProperties()
+                    ->first();
+                $element->fill(array_diff($data, $addData))->save();
+            }
         } catch (Exception $e) {
             $result = new Result();
             $result->setData($data);
@@ -366,10 +403,19 @@ abstract class BaseModel
      */
     public function getChangedProperties(): array
     {
-        $staticProperties = $this->getStaticProperties();
+        $properties = [];
+        foreach ($this->properties as $property => $value) {
+            if (! isset($this->originalProperties[$property])) {
+                $properties[$property] = $value;
+                continue;
+            }
+            if ($this->originalProperties[$property] !== $value) {
+                $properties[$property] = $value;
+            }
+        }
         return array_diff_key(
-            array_diff_assoc($this->properties, $this->originalProperties),
-            array_combine($staticProperties, array_fill(0, count($staticProperties), null))
+            $properties,
+            array_flip($this->getStaticProperties())
         );
     }
 

@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Pago\Bitrix\Models;
 
+use Bitrix\Iblock\ElementTable;
 use Exception;
 use Bitrix\Iblock\Iblock;
 use Bitrix\Iblock\ORM\CommonElementTable;
@@ -15,6 +16,7 @@ use Bitrix\Main\ORM\Objectify\Collection;
 use Bitrix\Main\ORM\Query\Result as QueryResult;
 use Bitrix\Main\SystemException;
 use Bitrix\Main\Type\DateTime;
+use Pago\Bitrix\Models\Cache\CacheService;
 use Pago\Bitrix\Models\Helpers\Helper;
 use Pago\Bitrix\Models\Helpers\IModelHelper;
 use Pago\Bitrix\Models\Queries\Builder;
@@ -22,46 +24,39 @@ use Pago\Bitrix\Models\Queries\IModelQuery;
 
 /**
  * Базовые свойства и методы модели инфоблока
- * @property int ID
- * @property DateTIme TIMESTAMP_X
- * @property int MODIFIED_BY
- * @property DateTime DATE_CREATE
- * @property int CREATED_BY
- * @property int IBLOCK_SECTION_ID
- * @property bool ACTIVE
- * @property DateTime ACTIVE_FROM
- * @property DateTime ACTIVE_TO
- * @property int SORT
- * @property string NAME
- * @property string|null DETAIL_PAGE_URL
- * @property int PREVIEW_PICTURE
- * @property int DETAIL_PICTURE
- * @property string PREVIEW_TEXT_TYPE
- * @property string PREVIEW_TEXT
- * @property string DETAIL_TEXT_TYPE
- * @property string DETAIL_TEXT
- * @property string XML_ID
- * @property string CODE
- * @property string TAGS
- * @method int getId
- * @method DateTime getTimestampX
- * @method int getModifiedBy
- * @method DateTime getDateCreate
- * @method int getCreatedBy
- * @method int getIblockSectionId
- * @method bool getActive
- * @method DateTime getActiveFrom
- * @method DateTime getActiveTo
- * @method int getSort
- * @method string getName
- * @method int getPreviewPicture
- * @method string getPreviewText
- * @method string getPreviewTextType
- * @method string getDetailPicture
- * @method string getDetailText
- * @method string getXmlId
- * @method string getCode
- * @method string getTags
+ * @property int ID Идентификатор элемента
+ * @property string|null TIMESTAMP_X Дата последнего изменения элемента
+ * @property int MODIFIED_BY Идентификатор пользователя, который последний раз изменил элемент
+ * @property string|null DATE_CREATE Дата создания элемента
+ * @property int CREATED_BY Идентификатор пользователя, который создал элемент
+ * @property int IBLOCK_ID Идентификатор инфоблока
+ * @property int IBLOCK_SECTION_ID Идентификатор раздела инфоблока
+ * @property bool ACTIVE Статус активности элемента
+ * @property string|null ACTIVE_FROM Дата начала активности элемента
+ * @property string|null ACTIVE_TO Дата окончания активности элемента
+ * @property int SORT Позиция элемента для сортировки
+ * @property string NAME Название элемента
+ * @property int PREVIEW_PICTURE Идентификатор изображения-превью
+ * @property string PREVIEW_TEXT Текст-превью
+ * @property string PREVIEW_TEXT_TYPE Тип текста-превью (например, "text" или "html")
+ * @property int DETAIL_PICTURE Идентификатор изображения для детальной страницы
+ * @property string DETAIL_TEXT Текст на детальной странице
+ * @property string DETAIL_TEXT_TYPE Тип текста на детальной странице (например, "text" или "html")
+ * @property string SEARCHABLE_CONTENT Строка контента для поиска
+ * @property int WF_STATUS_ID Статус рабочего процесса
+ * @property int WF_PARENT_ELEMENT_ID Идентификатор родительского элемента рабочего процесса
+ * @property string|null WF_NEW Признак нового элемента в рабочем процессе
+ * @property int WF_LOCKED_BY Идентификатор пользователя, который заблокировал элемент
+ * @property string|null WF_DATE_LOCK Дата блокировки элемента
+ * @property string WF_COMMENTS Комментарии рабочего процесса
+ * @property bool IN_SECTIONS Флаг нахождения в разделе
+ * @property string XML_ID Внешний идентификатор элемента
+ * @property string CODE Символьный код элемента
+ * @property string TAGS Теги элемента
+ * @property string TMP_ID Временный идентификатор
+ * @property int SHOW_COUNTER Количество показов элемента
+ * @property string|null SHOW_COUNTER_START Дата и время первого показа элемента
+ * @property string DETAIL_PAGE_URL URL страницы элемента
  * @method Builder|$this whereId(int|array $id)
  * @method Builder|$this whereTimestampX(DateTime|array $date, string $operator = '')
  * @method Builder|$this whereModifiedBy(int|array $id)
@@ -106,6 +101,17 @@ class IModel extends BaseModel
     public ElementV2|ElementV1|null $modelElement = null;
 
     /**
+     * Получить базовые поля инфоблока
+     * @return array
+     */
+    public static function getBaseFields(): array
+    {
+        return array_keys(
+            (new ElementTable())->getEntity()->getFields()
+        );
+    }
+
+    /**
      * Вычисление идентификатора инфоблока
      * @return int
      * @throws SystemException
@@ -118,15 +124,23 @@ class IModel extends BaseModel
         $class = explode('\\', static::class);
         $class = end($class);
         // Определение id из названия класса
-        if (! static::IBLOCK_CODE && preg_match('/iblock([0-9])+/i', $class)) {
+        if (!static::IBLOCK_CODE && preg_match('/iblock([0-9])+/i', $class)) {
             return Helper::getOnlyNumeric($class);
         }
         // По символьному коду
         if (static::IBLOCK_CODE) {
-            return IModelHelper::getIblockIdByCode((string)static::IBLOCK_CODE);
+            $code = (string)static::IBLOCK_CODE;
+        } else {
+            $code = Helper::camelToSnakeCase($class);
         }
-
-        return IModelHelper::getIblockIdByCode(Helper::camelToSnakeCase($class));
+        $iblock = IModelHelper::getIblockDataByCode($code);
+        if (! $iblock) {
+            throw new SystemException(sprintf('Инфоблок с кодом %s не найден', $code));
+        }
+        if (null === $iblock['API_CODE']) {
+            throw new SystemException(sprintf('API_CODE инфоблока %s не указан. Заполните API_CODE', $code));
+        }
+        return (int)$iblock['ID'];
     }
 
     /**
@@ -171,7 +185,7 @@ class IModel extends BaseModel
     }
 
     /**
-     * Чтение свойств из @see $element
+     * Чтение свойств
      * @param string $property
      * @return mixed
      */
@@ -180,7 +194,12 @@ class IModel extends BaseModel
         if (null === $this->element()) {
             return null;
         }
-        return $this->toArrayOnlyValues()[$property] ?? null;
+        $value = $this->toArray()[$property];
+        // Возможно это свойство
+        if (in_array($property, IModelHelper::getIblockPropertyCodes($this::iblockId()))) {
+            return $value['~VALUE'] ?? null;
+        }
+        return $value ?: null;
     }
 
     /**
@@ -203,18 +222,24 @@ class IModel extends BaseModel
      * @param Builder $builder
      * @return $this
      */
-    final public static function setElement(IModel $model, ElementV2|ElementV1 $element, Builder $builder): IModel
+    final public static function setElement(
+        IModel              $model,
+        ElementV2|ElementV1 $element,
+        Builder             $builder
+    ): IModel
     {
         $model->builder = $builder;
         $model->modelElement = $element;
-        $model->originalProperties = $model->properties = $model->toArray();
+        $model->originalProperties
+            = $model->properties
+            = $model->toArray();
         return $model;
     }
 
     /**
      * Вызов методов объекта ElementV1|ElementV1
-     * @param  string  $name
-     * @param  array  $arguments
+     * @param string $name
+     * @param array $arguments
      * @return null
      * @throws SystemException
      * @see ElementV2
@@ -230,19 +255,26 @@ class IModel extends BaseModel
     }
 
     /**
+     * Получить ID инфоблока
+     * @return int
+     */
+    public function getIblockId(): int
+    {
+        return $this->IBLOCK_ID ?: $this::iblockId();
+    }
+
+    /**
      * Детальная ссылка на элемент
      * @return string|null
      */
     public function getDetailPageUrl(): ?string
     {
-        $element = $this->element();
-        if (! method_exists($element, 'getId')) {
+        if (! $this->exists() || ! $this->builder) {
             return null;
         }
         if (null === $this->detailPageUrl) {
-            $elementId = (int)$element->getId();
             $this->detailPageUrl = IModelQuery::instance(static::class)
-                ->getDetailPageUrl($elementId)[$elementId];
+                ->getDetailPageUrl($this->builder, $this->ID)[$this->ID];
         }
 
         return $this->detailPageUrl;
@@ -258,15 +290,6 @@ class IModel extends BaseModel
     }
 
     /**
-     * Преобразование ответа в массив без связей
-     * @return array|null
-     */
-    public function toArrayOnlyValues(): ?array
-    {
-        return $this->toArray();
-    }
-
-    /**
      * Преобразование ответа в массив
      * @param bool $relations
      * @return array|null
@@ -274,13 +297,13 @@ class IModel extends BaseModel
     public function toArray(bool $relations = false): ?array
     {
         $element = $this->element();
-        if (! $element || ! method_exists($element, 'collectValues')) {
+        if (! $element || !method_exists($element, 'collectValues')) {
             return null;
         }
 
         return array_map(function ($value) use ($relations) {
             return $this->getToArrayValue($value, $relations);
-        }, $element->collectValues());
+        }, $element->collectValues() + $this->getProperties());
     }
 
     /**
@@ -317,6 +340,7 @@ class IModel extends BaseModel
             return $value;
         }
 
+        // Коллекции
         if ($collectionValue instanceof Collection) {
             $result = [];
             foreach ($collectionValue as $value) {

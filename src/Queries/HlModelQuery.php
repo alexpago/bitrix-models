@@ -22,12 +22,25 @@ final class HlModelQuery
     private string $model;
 
     /**
+     * @var DataManager
+     */
+    private DataManager $modelEntity;
+
+    /**
      * @param string $model Класс модели
      */
     public function __construct(string $model)
     {
         $this->model = $model;
         Helper::includeBaseModules();
+        /**
+         * @var HlModel $model
+         */
+        $model = new $this->model();
+        if (! $model instanceof HlModel) {
+            throw new SystemException('Model query must be instance of HlModel');
+        }
+        $this->modelEntity = new ($model::getEntityClass());
     }
 
     /**
@@ -40,18 +53,10 @@ final class HlModelQuery
     }
 
     /**
-     * @param array $filter
-     * @param array $select
-     * @param array $order
-     * @param int $limit
-     * @param int $offset
+     * @param Builder $builder
      * @return array
      */
     public function fetch(Builder $builder): array {
-        /**
-         * @var HlModel $model
-         */
-        $model = new $this->model();
         $data = [];
         $cache = [];
         if ($builder->cacheTtl > 0) {
@@ -62,8 +67,7 @@ final class HlModelQuery
                 ]
             ];
         }
-        $entity = $this->getEntityClass($model);
-        $query = $entity::getList(
+        $query = $this->modelEntity::getList(
             array_merge(
                 [
                     'filter' => $builder->getFilter(),
@@ -80,7 +84,7 @@ final class HlModelQuery
              * @var EntityObject $element
              * @var HlModel $model
              */
-            $model = clone $model;
+            $model = new $this->model();
             $data[] = $model->setElement($model, $element);
         }
 
@@ -95,9 +99,7 @@ final class HlModelQuery
      */
     public function getList(array $parameters = []): QueryResult
     {
-        $entity = $this->getEntityClass();
-
-        return $entity::getList($parameters);
+        return $this->modelEntity::getList($parameters);
     }
 
     /**
@@ -107,33 +109,6 @@ final class HlModelQuery
      * @see DataManager::getCount()
      */
     public function count(Builder $builder): int {
-        return $this->getEntityClass()::getCount($builder->getFilter());
-    }
-
-    /**
-     * Получение экземпляра класса @see DataManager
-     * @param HlModel|null $model
-     * @return DataManager
-     * @throws SystemException
-     */
-    private function getEntityClass(?HlModel $model = null): DataManager
-    {
-        if (null === $model) {
-            $model = new $this->model();
-        }
-        /**
-         * @var HlModel $model
-         */
-        $entity = $model::getEntityClass();
-        if (null === $entity) {
-            throw new SystemException(
-                sprintf(
-                    'Ошибка инициализации highload ID = %d',
-                    $model::hlId()
-                )
-            );
-        }
-
-        return new $entity();
+        return $this->modelEntity::getCount($builder->getFilter());
     }
 }
