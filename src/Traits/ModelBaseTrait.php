@@ -113,7 +113,16 @@ trait ModelBaseTrait
                 $select = [$select];
             }
             foreach ($select as $item) {
-                $this->select[] = $item;
+                // Перечисление полей через запятую в одном аргументе
+                if (str_contains($item, ',')) {
+                    $this->select = array_merge(
+                        $this->select,
+                        array_map(fn($item) => trim($item), explode(',', $item))
+                    );
+                } else {
+                    // Строки
+                    $this->select[] = is_string($item) ? trim($item) : $item;
+                }
             }
         }
         return $this;

@@ -16,7 +16,6 @@ use Bitrix\Main\ORM\Objectify\Collection;
 use Bitrix\Main\ORM\Query\Result as QueryResult;
 use Bitrix\Main\SystemException;
 use Bitrix\Main\Type\DateTime;
-use Pago\Bitrix\Models\Cache\CacheService;
 use Pago\Bitrix\Models\Helpers\Helper;
 use Pago\Bitrix\Models\Helpers\IModelHelper;
 use Pago\Bitrix\Models\Queries\Builder;
@@ -84,9 +83,6 @@ class IModel extends BaseModel
 
     // Переопределение ID инфоблока
     public const IBLOCK_ID = null;
-
-    // Производить unserialize перед выдачей свойств инфоблока, если оно serialized
-    public const UNSERIALIZE_PROPERTIES = true;
 
     /**
      * Ссылка на детальную страницу
@@ -197,7 +193,9 @@ class IModel extends BaseModel
         $value = $this->toArray()[$property];
         // Возможно это свойство
         if (in_array($property, IModelHelper::getIblockPropertyCodes($this::iblockId()))) {
-            return $value['~VALUE'] ?? null;
+            // Базовые свойства возвращают ~VALUE, VALUE
+            // Кастомные свойства могут возвращать любые данные
+            return $value['~VALUE'] ?? $value['VALUE'] ?? $value ?? null;
         }
         return $value ?: null;
     }
@@ -251,7 +249,7 @@ class IModel extends BaseModel
         if ($this->element() && preg_match('/get([a-z])/i', $name)) {
             return $this->element()->$name($arguments);
         }
-        return null;
+        return parent::__call($name, $arguments);
     }
 
     /**
@@ -273,10 +271,8 @@ class IModel extends BaseModel
             return null;
         }
         if (null === $this->detailPageUrl) {
-            $this->detailPageUrl = IModelQuery::instance(static::class)
-                ->getDetailPageUrl($this->builder, $this->ID)[$this->ID];
+            $this->detailPageUrl = IModelQuery::instance(static::class)->getDetailPageUrl($this->builder, $this->ID)[$this->ID];
         }
-
         return $this->detailPageUrl;
     }
 
@@ -327,14 +323,6 @@ class IModel extends BaseModel
                 && array_key_exists('VALUE', $value)
             ) {
                 $value = $value['VALUE'];
-            }
-
-            // Проверка на serialize объект
-            if ($this::UNSERIALIZE_PROPERTIES && is_string($value)) {
-                $serialize = unserialize($value);
-                if (false !== $serialize) {
-                    return $serialize;
-                }
             }
 
             return $value;

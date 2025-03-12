@@ -28,8 +28,7 @@ final class HlBlockDeleteHelper
     public static function deleteHighloadBlock(int $hlblockId): bool
     {
         // Получаем информацию о Highload-блоке
-        $hlblock = HLBT::getById($hlblockId)->fetch();
-        if (! $hlblock) {
+        if (! $hlblockId || ! ($hlblock = HLBT::getById($hlblockId)->fetch())) {
             throw new Exception('Ошибка при удалении Highload-блока! Highload не найден');
         }
 

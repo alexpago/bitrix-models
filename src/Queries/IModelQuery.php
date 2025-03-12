@@ -77,9 +77,7 @@ final class IModelQuery
          */
         $elements = [];
         $elementIds = [];
-        /**
-         * В первом запросе мы забираем только системные поля, без свойств
-         */
+        // В первом запросе мы забираем только системные поля, без свойств
         $query = $this->modelEntity::getList(
             array_merge(
                 [
@@ -100,13 +98,12 @@ final class IModelQuery
             $elementIds[] = $element->getId();
         }
 
-        // Загрузка свойств
+        // Загрузка свойств при указании withProperties или наличию свойств в select
         $properties = [];
-        if ($builder->withProperties) {
+        if ($builder->withProperties || $this->hasPropertyFields($builder)) {
             $properties = $this->getProperties(
                 $builder,
-                $elementIds,
-                $builder->getSelect()
+                $elementIds
             );
         }
 
@@ -170,13 +167,11 @@ final class IModelQuery
      * Получить свойства элемента через GetPropertyValuesArray
      * @param Builder $builder
      * @param IModel|int|array $elements
-     * @param array $select
      * @return array
      */
     public function getProperties(
         Builder          $builder,
         IModel|int|array $elements,
-        array            $select = []
     ): array
     {
         $iblockId = $builder->getModel()->getIblockId();
@@ -215,7 +210,7 @@ final class IModelQuery
                 'ID' => $elementIds
             ],
             propertyFilter: [
-                'CODE' => $this->collectPropertyFields($iblockId, $select)
+                'CODE' => $this->collectPropertyFields($builder)
             ]
         );
         // Запишем в кэш
@@ -287,23 +282,32 @@ final class IModelQuery
     private function collectBaseFields(array $select): array
     {
         if (in_array('*', $select)) {
-            return $select;
+            return ['*'];
         }
-        return array_intersect_key($select, array_flip(IModel::getBaseFields()));
+        return array_intersect($select, IModel::getBaseFields());
     }
 
     /**
      * Получить только свойства инфоблока
-     * @param int $iblockId
-     * @param array $select
+     * @param Builder $builder
      * @return array
      */
-    private function collectPropertyFields(int $iblockId, array $select): array
+    private function collectPropertyFields(Builder $builder): array
     {
-        $iblockProperties = IModelHelper::getIblockPropertyCodes($iblockId);
-        if (in_array('*', $select)) {
-            return $iblockProperties;
-        }
-        return array_intersect_key($select, array_flip($iblockProperties));
+        $iblockProperties = IModelHelper::getIblockPropertyCodes($builder->getModel()::iblockId());
+        return array_intersect($builder->getSelect(), $iblockProperties) ?: $iblockProperties;
+    }
+
+    /**
+     * В выборке участвуют поля свойств
+     * @param Builder $builder
+     * @return bool
+     */
+    private function hasPropertyFields(Builder $builder): bool
+    {
+        return (bool)array_intersect(
+            IModelHelper::getIblockPropertyCodes($builder->getModel()::iblockId()),
+            $builder->getSelect()
+        );
     }
 }

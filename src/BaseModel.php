@@ -5,9 +5,11 @@ namespace Pago\Bitrix\Models;
 
 use Bitrix\Highloadblock\DataManager;
 use Bitrix\Iblock\ORM\CommonElementTable;
+use Bitrix\Main\ArgumentException;
 use Bitrix\Main\DB\Exception;
 use Bitrix\Main\Error;
 use Bitrix\Main\ORM\Data\Result;
+use Bitrix\Main\SystemException;
 use Pago\Bitrix\Models\Helpers\DynamicTable;
 use Pago\Bitrix\Models\Helpers\IModelHelper;
 use Pago\Bitrix\Models\Queries\Builder;
@@ -182,6 +184,21 @@ abstract class BaseModel
     }
 
     /**
+     * @param string $name
+     * @param array $arguments
+     * @return mixed
+     */
+    public function __call(string $name, array $arguments)
+    {
+        // Построительный нового builder
+        $builder = new Builder(new static());
+        if (method_exists($builder, $name)) {
+            return $builder->$name(...$arguments);
+        }
+        return null;
+    }
+
+    /**
      * Получить primary ключ
      * @return string|null
      */
@@ -228,9 +245,10 @@ abstract class BaseModel
 
     /**
      * Обновление/сохранение элементов
+     * @param bool $callEvents
      * @return Result
      */
-    public function save(): Result
+    public function save(bool $callEvents = true): Result
     {
         $data = $this->getChangedProperties();
         if (! $data) {
@@ -238,9 +256,14 @@ abstract class BaseModel
         }
         $isIblockModel = $this instanceof IModel;
         $iblockId = $isIblockModel ? $this::iblockId() : 0;
-        // Обновление текущего элемента
+
+        /**
+         * Обновление текущего элемента
+         */
         if ($this->element()) {
-            $this->onBeforeUpdate();
+            if ($callEvents) {
+                $this->onBeforeUpdate();
+            }
             // Свойства инфоблока запишем и сохраним отдельно
             $iblockProperties = [];
             foreach ($data as $property => $value) {
@@ -269,7 +292,9 @@ abstract class BaseModel
                 $update->setData($data);
                 $update->addError(Error::createFromThrowable($e));
             }
-            $this->onAfterUpdate($update);
+            if ($callEvents) {
+                $this->onAfterUpdate($update);
+            }
 
             return $update;
         }
@@ -278,7 +303,9 @@ abstract class BaseModel
          * Добавление нового элемента
          * @var CommonElementTable|DataManager $entity
          */
-        $this->onBeforeAdd();
+        if ($callEvents) {
+            $this->onBeforeAdd();
+        }
         try {
             $addData = $data;
             // Для инфоблока добавим сначала поля инфоблока, потом свойства
@@ -292,14 +319,16 @@ abstract class BaseModel
                     ->where($this->getPrimaryKey(), $result->getId())
                     ->withProperties()
                     ->first();
-                $element->fill(array_diff($data, $addData))->save();
+                $element->fill(array_diff($data, $addData))->save(false);
             }
         } catch (Exception $e) {
             $result = new Result();
             $result->setData($data);
             $result->addError(Error::createFromThrowable($e));
         }
-        $this->onAfterAdd($result);
+        if ($callEvents) {
+            $this->onAfterAdd($result);
+        }
 
         return $result;
     }

@@ -242,6 +242,38 @@ final class IblockTest extends TestCase
     }
 
     /**
+     * Получение элемента
+     * @return void
+     */
+    public function testGetElement()
+    {
+        $elementId = $this->createRandomElements()[0];
+        $element = TestIblockModel::query()
+            ->whereId($elementId)
+            ->first();
+        $this->assertIsObject($element);
+        $this->assertNull($element->PRICE);
+        $this->assertNull($element->LABELS);
+
+        $element = TestIblockModel::query()
+            ->select('ID', 'PRICE')
+            ->whereId($elementId)
+            ->first();
+        $this->assertNotNull($element->PRICE);
+        $this->assertNotNull($element->ID);
+        $this->assertNull($element->LABELS);
+
+        $element = TestIblockModel::query()
+            ->withProperties()
+            ->select('ID, LABELS')
+            ->whereId($elementId)
+            ->first();
+        $this->assertNotNull($element->LABELS);
+        $this->assertNotNull($element->ID);
+        $this->assertNull($element->PRICE);
+    }
+
+    /**
      * Создать случайные элементы
      * @param int $count
      * @param int|null $price

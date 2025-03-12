@@ -337,7 +337,30 @@ CatalogModel::query()->whereId(100)->first(); // first() вернет экзем
 
 ### Выборка
 
-![](/resources/images/example-get.png)
+Пример выборки с фильтрацией
+
+```php
+$products = Catalog::query()
+    ->withProperties() // Прогрузить свойства инфоблоков
+    ->wherePrice(200, '>=')
+    ->whereBetween(
+        property: 'DATE_CREATE',
+        min: DateTime::tryeParse('01.01.2025', 'd.m.Y'),
+        MAX: DateTime::tryeParse('01.03.2025', 'd.m.Y')
+    )
+    ->withCache()
+    ->withDetailPageUrl() // Загрузить DETAIL_PAGE_URL для инфоблоков
+    ->get();
+$result = [];
+foreach ($products as $product) {
+    /**
+     * @var Catalog $product 
+     */
+    $result[$product->ID] = [
+        'PRICE' => $product->PRICE     
+    ];
+}
+```
 
 По умолчанию если не указывать `setSelect` будут выбраны все поля инфоблока **без свойств**. 
 ### Внимание:
@@ -460,9 +483,23 @@ foreach ($elements as $element) {
 
 У моделей доступны быстрые действия.
 
-### Удаление элемента 
+### Удаление элемента
 
-![](/resources/images/example-query-delete.png)
+Пример массового удаления из query
+```php
+$products = Catalog::query()
+    ->where(
+        property: 'DATE_CREATE',
+        operator: '<=',
+        value: DateTime::tryParse('01.01.2025', 'd.m.Y')
+    )
+    ->delete();
+// Результат <array>Bitrix\Main\ORM\Data\Result
+foreach ($products as $products) {
+    $success = $product->isSuccess();
+    $data = $product->getData();
+}
+```
 
 Любой элемент можно удалить одной командой
 
@@ -524,7 +561,22 @@ $element->NAME = 'Имя нового элемента';
 $element->save();
 ```
 
-![](/resources/images/example-model-save.png)
+Пример редактирования моделей из запросов
+```php
+$products = Catalog::query()
+    ->withProperties()
+    ->withCache()
+    ->withDetailPageUrl()
+    ->get();
+$result = [];
+foreach ($products as $product) {
+    /**
+     * @var Catalog $product
+     */
+     $product->PRICE = $product->PRICE + 200;
+     $product->save();
+}
+```
 
 > Так же можно использовать метод `put()`, который вызовет метод `save()` и вернет экземпляр созданного объекта. 
 
