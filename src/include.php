@@ -25,8 +25,12 @@ if (! defined('B_PROLOG_INCLUDED'))
     include_once $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_before.php';
 }
 
-if (defined('B_PROLOG_INCLUDED')) {
-    // Автозагрузка классов
+// Автозагрузка классов
+if (
+    defined('B_PROLOG_INCLUDED')
+    && defined('AUTOLOAD_MODELS')
+    && AUTOLOAD_MODELS === true
+) {
     $pathModels = $_SERVER['DOCUMENT_ROOT'] . Models\Base::DEFAULT_MODEL_PATH;
 
     if (is_dir($pathModels)) {
