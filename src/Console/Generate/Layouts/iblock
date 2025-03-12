@@ -8,7 +8,6 @@ use Bitrix\Iblock\ORM\ValueStorage;
 use Bitrix\Main\ORM\Objectify\Collection;
 
 /**
- * Для вызова методов getProperty и получения значения используйте метод getValue()
 #PROPERTIES#
  * @method static Builder|$this query()
  * @method Builder|$this get()
