@@ -9,7 +9,9 @@ use Bitrix\Main\Loader;
 use Bitrix\Main\ORM\Objectify\EntityObject;
 use Bitrix\Main\ORM\Query\Result as QueryResult;
 use Bitrix\Main\SystemException;
+use Exception;
 use Pago\Bitrix\Models\Helpers\HlModelHelper;
+use Pago\Bitrix\Models\Queries\Builder;
 use Pago\Bitrix\Models\Queries\HlModelQuery;
 
 /**
@@ -17,7 +19,10 @@ use Pago\Bitrix\Models\Queries\HlModelQuery;
  */
 abstract class HlModel extends BaseModel
 {
+    // Переопределение ID справочника
     public const HL_ID = null;
+
+    // Переопределение кода справочника
     public const HL_CODE = null;
 
     /**
@@ -28,6 +33,7 @@ abstract class HlModel extends BaseModel
     /**
      * Сущность класса highload блока
      * @return string|null
+     * @throws Exception
      */
     final public static function getEntityClass(): ?string
     {
@@ -69,13 +75,21 @@ abstract class HlModel extends BaseModel
         }
         // По символьному коду
         if (static::HL_CODE) {
-            return HlModelHelper::getHlIdByCode((string)static::HL_CODE);
+            $hlId = HlModelHelper::getHlIdByCode((string)static::HL_CODE);
+            if (! $hlId) {
+                throw new SystemException(sprintf('Highload блок с кодом %s не найден', static::HL_CODE));
+            }
+            return $hlId;
         }
 
         $class = explode('\\', static::class);
         $class = end($class);
+        $hlId = HlModelHelper::getHlIdByCode($class);
+        if (! $hlId) {
+            throw new SystemException(sprintf('Highload блок с кодом %s не найден', static::HL_CODE));
+        }
 
-        return HlModelHelper::getHlIdByCode($class);
+        return $hlId;
     }
 
     /**
@@ -90,65 +104,42 @@ abstract class HlModel extends BaseModel
     }
 
     /**
+     * @param HlModel $model
+     * @param EntityObject $element
+     * @return $this
+     */
+    final public static function setElement(HlModel $model, EntityObject $element): static
+    {
+        $model->modelElement = $element;
+        try {
+            $model->originalProperties = $element->collectValues();
+            $model->fill($model->originalProperties);
+        } catch (SystemException) {
+        }
+        return $model;
+    }
+
+    /**
      * Результат запроса
-     * @param int|null $limit
-     * @param int|null $offset
+     * @param Builder $builder
      * @return array<static>
      */
-    public function get(?int $limit = null, ?int $offset = null): array
+    public static function get(Builder $builder): array
     {
-        if (null !== $limit) {
-            $this->setLimit($limit);
-        }
-        if (null !== $offset) {
-            $this->setOffset($offset);
-        }
-
-        return HlModelQuery::instance(static::class)->fetch(
-            filter: $this->queryFilter,
-            select: $this->querySelect,
-            order: $this->queryOrder,
-            limit: $this->queryLimit,
-            offset: $this->queryOffset,
-            cacheTtl: $this->cacheTtl,
-            cacheJoin: $this->cacheJoin
-        );
+        return HlModelQuery::instance(static::class)->fetch($builder);
     }
 
     /**
      * Количество элементов в БД
+     * @param Builder|null $builder
      * @return int
      */
-    public function count(): int
+    public static function count(?Builder $builder = null): int
     {
-        if (! $this->queryIsInit) {
-            return 0;
+        if (! $builder) {
+            $builder = new Builder(new static());
         }
-
-        return HlModelQuery::instance(static::class)->count($this->queryFilter);
-    }
-
-    /**
-     * @param EntityObject $element
-     * @return $this
-     */
-    public function setElement(EntityObject $element): static
-    {
-        $this->modelElement = $element;
-        try {
-            $this->originalProperties = $element->collectValues();
-            $this->fill($this->originalProperties);
-        } catch (SystemException) {}
-
-        return $this;
-    }
-
-    /**
-     * @return EntityObject|null
-     */
-    public function element(): EntityObject|null
-    {
-        return $this->modelElement;
+        return HlModelQuery::instance(static::class)->count($builder);
     }
 
     /**
@@ -158,9 +149,17 @@ abstract class HlModel extends BaseModel
     public function toArray(): ?array
     {
         try {
-            return $this->element()->collectValues();
+            return $this->modelElement->collectValues();
         } catch (SystemException) {
             return null;
         }
+    }
+
+    /**
+     * @return EntityObject|null
+     */
+    public function element(): EntityObject|null
+    {
+        return $this->modelElement;
     }
 }

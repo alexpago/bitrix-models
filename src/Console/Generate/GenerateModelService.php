@@ -3,8 +3,6 @@ declare(strict_types=1);
 
 namespace Pago\Bitrix\Models\Console\Generate;
 
-use Bitrix\Highloadblock\HighloadBlockTable;
-use Bitrix\Iblock\IblockTable;
 use Bitrix\Main\SystemException;
 use Pago\Bitrix\Models\Console\Generate\Models\HlBlock;
 use Pago\Bitrix\Models\Console\Generate\Models\Iblock;
@@ -12,7 +10,10 @@ use Pago\Bitrix\Models\Console\Generate\Models\Table;
 use Pago\Bitrix\Models\Console\Traits\ConsoleBaseMethods;
 use Pago\Bitrix\Models\Console\Traits\ConsoleMessage;
 use Pago\Bitrix\Models\Helpers\Helper;
+use Pago\Bitrix\Models\Helpers\HlModelHelper;
 use Pago\Bitrix\Models\Helpers\TableModelHelper;
+use Pago\Bitrix\Models\Models\HlblockTable;
+use Pago\Bitrix\Models\Models\IblockTable;
 
 /**
  * Консольные команды генерация модели
@@ -52,18 +53,24 @@ final class GenerateModelService
         // Считываем метод переданный при вызове (тип генерации модели)
         $this->method = $this->getMethodFromInputArguments($arguments);
 
+        // Переданные идентификаторы в аргументах
+        $elements = null;
+        if (count($this->arguments) > 1) {
+            $elements = array_slice(array_keys($this->arguments), 1);
+        }
+
         match (is_string($this->method) ? strtolower($this->method) : null) {
             // Генерация инфоблоков
-            'iblock', 'ib' => call_user_func(function () {
-                $this->generateIModel();
+            'iblock', 'ib' => call_user_func(function () use ($elements) {
+                $this->generateIModel($elements);
             }),
             // Генерация highload блоков
-            'hlblock', 'highloadblock', 'hb', 'hl' => call_user_func(function () {
-                $this->generateHlModel();
+            'hlblock', 'highloadblock', 'hb', 'hl' => call_user_func(function () use ($elements) {
+                $this->generateHlModel($elements);
             }),
             // Генерация таблиц
-            'table' => call_user_func(function () {
-                $this->generateTableModel();
+            'table' => call_user_func(function () use ($elements) {
+                $this->generateTableModel($elements);
             }),
             default => call_user_func(function () {
                 $this->hello();
@@ -84,179 +91,170 @@ final class GenerateModelService
 
     /**
      * Генерация таблиц
+     * @param array|null $inputNames
      * @return void
      * @throws SystemException
      */
-    public function generateTableModel(): void
+    public function generateTableModel(array|null $inputNames = null): void
     {
-        $message = 'Введите название таблицы через пробел для генерации модели.' . PHP_EOL;
-        $message .= 'Для выхода введите "q".';
-        do {
+        if (! $inputNames) {
+            $message = 'Введите название таблицы через пробел для генерации модели.' . PHP_EOL;
+            $message .= 'Для выхода введите "q".';
+
             $this->info($message);
-            $input = explode(' ', strtolower($this->question('Ввод')));
+            $inputNames = explode(' ', strtolower($this->question('Ввод')));
+        }
 
-            foreach ($input as $tableName) {
-                if (! $tableName) {
-                    continue;
-                }
-                if (! TableModelHelper::instance()->checkTableExists($tableName)) {
-                    $this->error(sprintf('Таблица %s не найдена', $tableName));
-                    continue;
-                }
-                $generateModel = new Table(
-                    tableName: $tableName,
-                    path: $this->getArgument('path'),
-                    namespace: $this->getArgument('namespace')
-                );
-                $generate = $generateModel->generateModel();
-                if ($generate->success) {
-                    // Заменим имя таблицы на CamelCase, так как указано имя таблицы
-                    $generate->name = Helper::snakeToCamelCase($generate->name, true);
-                    $this->creationSuccess($generate, $tableName);
-                } else {
-                    $this->creationError($generate, $tableName);
-                }
-                $this->creationWarnings($generate);
+        // Вывод всех таблиц для выбора
+        foreach ($inputNames as $tableName) {
+            if (! $tableName) {
+                continue;
             }
-
-            $input = strtolower($this->question('Продолжить y/n?'));
-        } while (! ('n' === $input || 'q' === $input));
+            if (!TableModelHelper::instance()->checkTableExists($tableName)) {
+                $this->error(sprintf('Таблица %s не найдена', $tableName));
+                continue;
+            }
+            $generateModel = new Table(
+                tableName: $tableName,
+                path: $this->getArgument('path'),
+                namespace: $this->getArgument('namespace')
+            );
+            $generate = $generateModel->generateModel();
+            if ($generate->success) {
+                // Заменим имя таблицы на CamelCase, так как указано имя таблицы
+                $generate->name = Helper::snakeToCamelCase($generate->name, true);
+                $this->creationSuccess($generate, $tableName);
+            } else {
+                $this->creationError($generate, $tableName);
+            }
+            $this->creationWarnings($generate);
+        }
     }
 
     /**
      * Генерация highload
+     * @param array|null $inputIds
      * @return void
      * @throws SystemException
      */
-    public function generateHlModel(): void
+    public function generateHlModel(array|null $inputIds = null): void
     {
-        $lists = HighloadBlockTable::query()
-            ->setSelect([
-                'ID',
-                'NAME',
-                'TABLE_NAME'
-            ])
-            ->fetchAll();
-        $lists = array_combine(
-            array_column($lists, 'ID'),
-            array_values($lists)
-        );
-        $message = 'Введите идентификаторы highload блоков через пробел для генерации модели.' . PHP_EOL;
-        $message .= 'или all для всех. Для выхода введите "q".';
-        do {
+        $hls = HlblockTable::query()->get();
+
+        // Запрашиваем ID или all если нужно создать для всех
+        if (! $inputIds) {
+            $message = 'Введите идентификаторы highload блоков через пробел для генерации модели.' . PHP_EOL;
+            $message .= 'или all для всех. Для выхода введите "q".';
+
+            // Вывод всех справочников для выбора
             $this->info($message);
-            foreach ($lists as $entity) {
+            foreach ($hls as $hl) {
                 $this->info(sprintf(
                     '%d - %s, TABLE_NAME: %s',
-                    (int)$entity['ID'],
-                    $entity['NAME'],
-                    $entity['TABLE_NAME']
+                    $hl->ID,
+                    $hl->NAME,
+                    $hl->TABLE_NAME
                 ));
             }
-            $input = explode(' ', strtolower($this->question('Ввод')));
-            if ($input && in_array('all', $input)) {
-                $input = array_keys($lists);
+            $inputIds = explode(' ', strtolower($this->question('Ввод')));
+        }
+        if ($inputIds && in_array('all', $inputIds)) {
+            $inputIds = array_map(function (HlblockTable $hls) {
+                return $hls->ID;
+            }, $hls);
+        }
+        // Создаем модели для каждого указанного справочника
+        foreach ($inputIds as $hlId) {
+            $hlId = (int)$hlId;
+            if (! $hlId) {
+                continue;
             }
-
-            foreach ($input as $hlId) {
-                $hlId = (int)$hlId;
-                if (! $hlId) {
-                    continue;
-                }
-                $generateModel = new HlBlock(
-                    id: $hlId,
-                    path: $this->getArgument('path'),
-                    namespace: $this->getArgument('namespace')
-                );
-                $generate = $generateModel->generateModel();
-                if ($generate->success) {
-                    $this->creationSuccess($generate, $hlId);
-                } else {
-                    $this->creationError($generate, $hlId);
-                }
-                $this->creationWarnings($generate);
+            // Проверка существования HL
+            if (! HlModelHelper::getHlCodeById($hlId)) {
+                $this->warning(sprintf('Справочник %d не найден', $hlId));
+                continue;
             }
-
-            $input = strtolower($this->question('Продолжить y/n?'));
-        } while (! ('n' === $input || 'q' === $input));
+            $generateModel = new HlBlock(
+                id: $hlId,
+                path: $this->getArgument('path'),
+                namespace: $this->getArgument('namespace')
+            );
+            $generate = $generateModel->generateModel();
+            if ($generate->success) {
+                $this->creationSuccess($generate, $hlId);
+            } else {
+                $this->creationError($generate, $hlId);
+            }
+            $this->creationWarnings($generate);
+        }
     }
 
     /**
      * Генерация инфоблоков
+     * @param array|null $inputIds
      * @return void
      * @throws SystemException
      */
-    public function generateIModel(): void
+    public function generateIModel(array|null $inputIds = null): void
     {
-        $lists = IblockTable::query()
-            ->setSelect([
-                'ID',
-                'IBLOCK_TYPE_ID',
-                'NAME',
-                'CODE',
-                'API_CODE',
-                'VERSION'
-            ])
-            ->setFilter([
-                'ACTIVE' => 'Y'
-            ])
-            ->fetchAll();
-        $lists = array_combine(
-            array_column($lists, 'ID'),
-            array_values($lists)
-        );
-        $message = 'Введите идентификаторы инфоблоков через пробел для генерации модели.' . PHP_EOL;
-        $message .= 'или all для всех. Для выхода введите "q".';
-        do {
+        $iblocks = IblockTable::query()->get();
+        // Запрашиваем ID или all если нужно создать для всех
+        if (! $inputIds) {
+            $message = 'Введите идентификаторы инфоблоков через пробел для генерации модели.' . PHP_EOL;
+            $message .= 'или all для всех. Для выхода введите "q".';
             $this->info($message);
-            foreach ($lists as $iblock) {
+
+            // Вывод всех инфоблоков для выбора
+            foreach ($iblocks as $iblock) {
                 $this->info(sprintf(
                     '%d - %s CODE: %s, API_CODE: %s',
-                    (int)$iblock['ID'],
-                    $iblock['NAME'],
-                    $iblock['CODE'] ?: '-',
-                    $iblock['API_CODE'] ?: '-'
+                    $iblock->ID,
+                    $iblock->NAME,
+                    $iblock->CODE ?: '-',
+                    $iblock->API_CODE ?: '-'
                 ));
 
-                if (! $iblock['CODE']) {
+                if (! $iblock->CODE) {
                     $this->warning('WARNING: Не заполнен символьный код. Рекомендуется указать его');
                 }
             }
 
-            $input = explode(' ', strtolower($this->question('Ввод')));
-            if ($input && in_array('all', $input)) {
-                $input = array_keys($lists);
+            $inputIds = explode(' ', strtolower($this->question('Ввод')));
+        }
+        if ($inputIds && in_array('all', $inputIds)) {
+            $inputIds = array_map(function (IblockTable $iblock) {
+                return $iblock->ID;
+            }, $iblocks);
+        }
+        // Создаем модели для каждого указанного инфоблока
+        foreach ($inputIds as $iblockId) {
+            $iblock = IblockTable::query()->whereId($iblockId)->first();
+            if (! $iblock) {
+                continue;
             }
-            foreach ($input as $iblockId) {
-                $iblockId = (int)$iblockId;
-                if (! $iblockId) {
-                    continue;
-                }
-                $generateModel = new Iblock(
-                    id: $iblockId,
-                    path: $this->getArgument('path'),
-                    namespace: $this->getArgument('namespace')
-                );
-                $generate = $generateModel->generateModel();
-                if ($generate->success) {
-                    $this->creationSuccess($generate, $iblockId);
-                } else {
-                    $this->creationError($generate, $iblockId);
-                }
-                $this->creationWarnings($generate);
+            $generateModel = new Iblock(
+                id: $iblock->ID,
+                path: $this->getArgument('path'),
+                namespace: $this->getArgument('namespace')
+            );
+            $generate = $generateModel->generateModel();
+            if ($generate->success) {
+                $this->creationSuccess($generate, $iblockId);
+            } else {
+                $this->creationError($generate, $iblockId);
+            }
+            $this->creationWarnings($generate);
 
-                // Генерация API_CODE при его отсутствии
-                if ($generate->success && empty($lists[$iblockId]['API_CODE'])) {
-                    $this->warning('У инфоблока отсутствует обязательное значение API_CODE. Устанавливаю API_CODE');
-                    if ($generateModel->setApiCode()) {
-                        $this->success('API_CODE успешно установлен');
-                    } else {
-                        $this->success('Ошибка установки API_CODE');
-                    }
+            // Генерация API_CODE при его отсутствии
+            if ($generate->success && ! $iblock->API_CODE) {
+                $this->warning('У инфоблока отсутствует обязательное значение API_CODE. Устанавливаю API_CODE');
+                if ($generateModel->setApiCode()) {
+                    $this->success('API_CODE успешно установлен');
+                } else {
+                    $this->success('Ошибка установки API_CODE');
                 }
             }
-            $input = strtolower($this->question('Продолжить y/n?'));
-        } while (! ('n' === $input || 'q' === $input));
+        }
     }
 
     /**

@@ -22,12 +22,25 @@ final class HlModelQuery
     private string $model;
 
     /**
+     * @var DataManager
+     */
+    private DataManager $modelEntity;
+
+    /**
      * @param string $model Класс модели
      */
     public function __construct(string $model)
     {
         $this->model = $model;
         Helper::includeBaseModules();
+        /**
+         * @var HlModel $model
+         */
+        $model = new $this->model();
+        if (! $model instanceof HlModel) {
+            throw new SystemException('Model query must be instance of HlModel');
+        }
+        $this->modelEntity = new ($model::getEntityClass());
     }
 
     /**
@@ -40,45 +53,28 @@ final class HlModelQuery
     }
 
     /**
-     * @param array $filter
-     * @param array $select
-     * @param array $order
-     * @param int $limit
-     * @param int $offset
+     * @param Builder $builder
      * @return array
      */
-    public function fetch(
-        array $filter = [],
-        array $select = ['*'],
-        array $order = [],
-        int $limit = 999_999_999_999,
-        int $offset = 0,
-        int $cacheTtl = 0,
-        bool $cacheJoin = false
-    ): array {
-        /**
-         * @var HlModel $model
-         */
-        $model = new $this->model();
+    public function fetch(Builder $builder): array {
         $data = [];
         $cache = [];
-        if ($cacheTtl > 0) {
+        if ($builder->cacheTtl > 0) {
             $cache = [
                 'cache' => [
-                    'ttl' => $cacheTtl,
-                    'cache_joins' => $cacheJoin
+                    'ttl' => $builder->cacheTtl,
+                    'cache_joins' => $builder->cacheJoin
                 ]
             ];
         }
-        $entity = $this->getEntityClass($model);
-        $query = $entity::getList(
+        $query = $this->modelEntity::getList(
             array_merge(
                 [
-                    'filter' => $filter,
-                    'select' => $select,
-                    'order' => $order,
-                    'limit' => $limit,
-                    'offset' => $offset
+                    'filter' => $builder->getFilter(),
+                    'select' => $builder->getSelect(),
+                    'order' => $builder->getOrder(),
+                    'limit' => $builder->getLimit(),
+                    'offset' => $builder->getOffset()
                 ],
                 $cache
             )
@@ -88,8 +84,8 @@ final class HlModelQuery
              * @var EntityObject $element
              * @var HlModel $model
              */
-            $model = clone $model;
-            $data[] = $model->setElement($element);
+            $model = new $this->model();
+            $data[] = $model->setElement($model, $element);
         }
 
         return $data;
@@ -103,47 +99,16 @@ final class HlModelQuery
      */
     public function getList(array $parameters = []): QueryResult
     {
-        $entity = $this->getEntityClass();
-
-        return $entity::getList($parameters);
+        return $this->modelEntity::getList($parameters);
     }
 
     /**
      * Фасет GetCount
-     * @param array $filter
+     * @param Builder $builder
      * @return int
      * @see DataManager::getCount()
      */
-    public function count(array $filter = []): int {
-        $entity = $this->getEntityClass();
-
-        return $entity::getCount($filter);
-    }
-
-    /**
-     * Получение экземпляра класса @see DataManager
-     * @param HlModel|null $model
-     * @return DataManager
-     * @throws SystemException
-     */
-    private function getEntityClass(?HlModel $model = null): DataManager
-    {
-        if (null === $model) {
-            $model = new $this->model();
-        }
-        /**
-         * @var HlModel $model
-         */
-        $entity = $model::getEntityClass();
-        if (null === $entity) {
-            throw new SystemException(
-                sprintf(
-                    'Ошибка инициализации highload ID = %d',
-                    $model::hlId()
-                )
-            );
-        }
-
-        return new $entity();
+    public function count(Builder $builder): int {
+        return $this->modelEntity::getCount($builder->getFilter());
     }
 }

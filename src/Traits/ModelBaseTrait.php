@@ -9,13 +9,32 @@ namespace Pago\Bitrix\Models\Traits;
 trait ModelBaseTrait
 {
     /**
+     * Загрузить properties для инфоблоков
+     * @var bool
+     */
+    public bool $withProperties = false;
+
+    /**
+     * Загрузить ссылку на детальную страницу для инфоблоков
+     * @var bool
+     */
+    public bool $withDetailPageUrl = false;
+
+    /**
      * @return $this
      */
     public function setFilter(array $filter): static
     {
-        $this->queryFilter = $filter;
-
+        $this->filter = $filter;
         return $this;
+    }
+
+    /**
+     * @return array
+     */
+    public function getFilter(): array
+    {
+        return $this->filter;
     }
 
     /**
@@ -24,8 +43,7 @@ trait ModelBaseTrait
      */
     public function setLimit(int $limit): static
     {
-        $this->queryLimit = $limit;
-
+        $this->limit = $limit;
         return $this;
     }
 
@@ -39,12 +57,20 @@ trait ModelBaseTrait
     }
 
     /**
+     * @return int
+     */
+    public function getLimit(): int
+    {
+        return $this->limit;
+    }
+
+    /**
      * @param int $offset
      * @return $this
      */
     public function setOffset(int $offset): static
     {
-        $this->queryOffset = $offset;
+        $this->offset = $offset;
 
         return $this;
     }
@@ -59,13 +85,20 @@ trait ModelBaseTrait
     }
 
     /**
+     * @return int
+     */
+    public function getOffset(): int
+    {
+        return $this->offset;
+    }
+
+    /**
      * @param array $select
      * @return $this
      */
     public function setSelect(array $select): static
     {
-        $this->querySelect = $select;
-
+        $this->select = $select;
         return $this;
     }
 
@@ -76,15 +109,31 @@ trait ModelBaseTrait
     public function select(...$arguments): static
     {
         foreach ($arguments as $select) {
-            if (!is_array($select)) {
+            if (! is_array($select)) {
                 $select = [$select];
             }
             foreach ($select as $item) {
-                $this->querySelect[] = $item;
+                // Перечисление полей через запятую в одном аргументе
+                if (str_contains($item, ',')) {
+                    $this->select = array_merge(
+                        $this->select,
+                        array_map(fn($item) => trim($item), explode(',', $item))
+                    );
+                } else {
+                    // Строки
+                    $this->select[] = is_string($item) ? trim($item) : $item;
+                }
             }
         }
-
         return $this;
+    }
+
+    /**
+     * @return array
+     */
+    public function getSelect(): array
+    {
+        return $this->select ?: ['*'];
     }
 
     /**
@@ -97,7 +146,6 @@ trait ModelBaseTrait
     {
         $this->cacheTtl = $ttl;
         $this->cacheJoin = $withJoin;
-
         return $this;
     }
 
@@ -108,7 +156,6 @@ trait ModelBaseTrait
     public function withoutCache(): static
     {
         $this->cacheTtl = 0;
-
         return $this;
     }
     
@@ -118,8 +165,7 @@ trait ModelBaseTrait
      */
     public function setOrder(array $order): static
     {
-        $this->queryOrder = $order;
-
+        $this->order = $order;
         return $this;
     }
 
@@ -131,8 +177,7 @@ trait ModelBaseTrait
      */
     public function order(string $column, string $order = 'asc'): static
     {
-        $this->queryOrder[$column] = $order;
-
+        $this->order[$column] = $order;
         return $this;
     }
 
@@ -144,5 +189,34 @@ trait ModelBaseTrait
     public function orderDesc(string $column): static
     {
         return $this->order($column, 'desc');
+    }
+
+    /**
+     * @return array
+     */
+    public function getOrder(): array
+    {
+        return $this->order;
+    }
+
+    /**
+     * Включить свойства инфоблока (для инфоблоков)
+     * @param bool $includeProperties
+     * @return $this
+     */
+    public function withProperties(bool $includeProperties = true): static
+    {
+        $this->withProperties = $includeProperties;
+        return $this;
+    }
+
+    /**
+     * Получить элементы с загрузкой детальной страницы (для инфоблоков)
+     * @return $this
+     */
+    public function withDetailPageUrl(): static
+    {
+        $this->withDetailPageUrl = true;
+        return $this;
     }
 }

@@ -5,7 +5,6 @@ namespace Pago\Bitrix\Models\Helpers;
 
 use Bitrix\Highloadblock\HighloadBlockTable;
 use Bitrix\Main\Entity\ReferenceField;
-use Bitrix\Main\SystemException;
 use Bitrix\Main\UserFieldLangTable;
 use Bitrix\Main\UserFieldTable;
 
@@ -17,7 +16,7 @@ final class HlModelHelper
     /**
      * @var array
      */
-    private static array $blocks = [];
+    private static array $cacheBlocks = [];
 
     /**
      * @var array
@@ -85,28 +84,48 @@ final class HlModelHelper
      */
     public static function getHlIdByCode(string $code): int
     {
-        if (! self::$blocks) {
-            $blocks = HighloadBlockTable::query()
+        $hls = self::getHls();
+        $search = array_search($code, array_column($hls, 'CODE'));
+        return intval($hls[$search]['ID'] ?? 0);
+    }
+
+    /**
+     * Код highload блока по ID
+     * @param int $hlId
+     * @return string|null
+     */
+    public static function getHlCodeById(int $hlId): ?string
+    {
+        $hls = self::getHls();
+        $search = array_search($hlId, array_column($hls, 'ID'));
+        return false !== $search ? $hls[$search]['CODE'] : null;
+    }
+
+    /**
+     * @return void
+     */
+    public static function clearHighloadModelCache(): void
+    {
+        self::$cacheBlocks = [];
+    }
+
+    /**
+     * Получить справочники
+     * @param bool $refreshCache
+     * @return array
+     */
+    private static function getHls(bool $refreshCache = false): array
+    {
+        if (! self::$cacheBlocks || $refreshCache) {
+            self::$cacheBlocks = HighloadBlockTable::query()
                 ->setSelect([
                     'ID',
                     'NAME',
                     'CODE' => 'NAME',
                     'TABLE_NAME'
                 ])
-                ->fetchAll();
-
-            array_map(function (array $value) {
-                self::$blocks[] = $value;
-            }, $blocks);
+                ->fetchAll() ?: [];
         }
-        $search = array_search(
-            $code,
-            array_column(self::$blocks, 'CODE')
-        );
-        if (false === $search) {
-            throw new SystemException(sprintf('Highload блок с кодом %s не найден', $code));
-        }
-
-        return (int)self::$blocks[$search]['ID'];
+        return self::$cacheBlocks;
     }
 }

@@ -8,6 +8,7 @@ use Bitrix\Main\SystemException;
 use Pago\Bitrix\Models\Helpers\DynamicTable;
 use Pago\Bitrix\Models\Helpers\Helper;
 use Pago\Bitrix\Models\Helpers\TableModelHelper;
+use Pago\Bitrix\Models\Queries\Builder;
 use Pago\Bitrix\Models\Queries\TableModelQuery;
 use Pago\Bitrix\Models\Traits\ModelBaseTrait;
 use Pago\Bitrix\Models\Traits\ModelWhereTrait;
@@ -20,6 +21,9 @@ abstract class TableModel extends BaseModel
     use ModelBaseTrait;
     use ModelWhereTrait;
 
+    // Переопределение названия таблицы
+    public const TABLE_NAME = null;
+
     /**
      * @var EntityObject|null
      */
@@ -31,8 +35,10 @@ abstract class TableModel extends BaseModel
      */
     public static function getTableName(): string
     {
+        if (static::TABLE_NAME) {
+            return static::TABLE_NAME;
+        }
         $class = explode('\\', get_called_class());
-
         return Helper::camelToSnakeCase((string)end($class));
     }
 
@@ -48,51 +54,53 @@ abstract class TableModel extends BaseModel
     }
 
     /**
-     * @param int|null $limit
-     * @param int|null $offset
+     * Экземпляр объекта таблицы
+     * @return DynamicTable|null
+     */
+    final public static function getEntity(): ?DynamicTable
+    {
+        $entity = new DynamicTable();
+        $entity::$tableName = static::getTableName();
+        $entity::$map = static::getMap();
+
+        return $entity;
+    }
+
+    /**
+     * @param Builder $builder
      * @return array|static[]
      */
-    public function get(?int $limit = null, ?int $offset = null): array
+    public static function get(Builder $builder): array
     {
-        if (null !== $limit) {
-            $this->setLimit($limit);
-        }
-        if (null !== $offset) {
-            $this->setOffset($offset);
-        }
-
-        return TableModelQuery::instance(static::class)->fetch(
-            filter: $this->queryFilter,
-            select: $this->querySelect,
-            order: $this->queryOrder,
-            limit: $this->queryLimit,
-            offset: $this->queryOffset,
-            cacheTtl: $this->cacheTtl,
-            cacheJoin: $this->cacheJoin
-        );
+        return TableModelQuery::instance(static::class)->fetch($builder);
     }
 
     /**
      * @param EntityObject $element
      * @return $this
      */
-    public function setElement(EntityObject $element): static
+    public static function setElement(TableModel $model, EntityObject $element): static
     {
-        $this->modelElement = $element;
+        $model->modelElement = $element;
         try {
-            $this->originalProperties = $element->collectValues();
-            $this->fill($this->originalProperties);
-        } catch (SystemException) {}
-
-        return $this;
+            $model->originalProperties = $element->collectValues();
+            $model->fill($model->originalProperties);
+        } catch (SystemException) {
+        }
+        return $model;
     }
 
     /**
-     * @return EntityObject|null
+     * Количество элементов в БД
+     * @param Builder|null $builder
+     * @return int
      */
-    public function element(): EntityObject|null
+    public static function count(?Builder $builder = null): int
     {
-        return $this->modelElement;
+        if (! $builder) {
+            $builder = new Builder(new static());
+        }
+        return TableModelQuery::instance(static::class)->count($builder);
     }
 
     /**
@@ -105,15 +113,10 @@ abstract class TableModel extends BaseModel
     }
 
     /**
-     * Экземпляр объекта таблицы
-     * @return DynamicTable|null
+     * @return EntityObject|null
      */
-    final public static function getEntity(): ?DynamicTable
+    public function element(): EntityObject|null
     {
-        $entity = new DynamicTable();
-        $entity::$tableName = static::getTableName();
-        $entity::$map = static::getMap();
-
-        return $entity;
+        return $this->modelElement;
     }
 }

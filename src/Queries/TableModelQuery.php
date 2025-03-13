@@ -21,11 +21,23 @@ final class TableModelQuery
     private string $model;
 
     /**
+     * @var DynamicTable
+     */
+    private DynamicTable $modelEntity;
+
+    /**
      * @param string $model Класс модели
      */
     public function __construct(string $model)
     {
         $this->model = $model;
+        /**
+         * @var TableModel $model
+         */
+        $model = new $this->model();
+        $this->modelEntity = new DynamicTable();
+        $this->modelEntity::$tableName = $model::getTableName();
+        $this->modelEntity::$map = $model::getMap();
     }
 
     /**
@@ -38,46 +50,29 @@ final class TableModelQuery
     }
 
     /**
-     * @param array $filter
-     * @param array $select
-     * @param array $order
-     * @param int $limit
-     * @param int $offset
-     * @param int $cacheTtl
-     * @param bool $cacheJoin
+     * @param Builder $builder
      * @return TableModel[]
      */
-    public function fetch(
-        array $filter = [],
-        array $select = ['*'],
-        array $order = [],
-        int $limit = 999_999_999_999,
-        int $offset = 0,
-        int $cacheTtl = 0,
-        bool $cacheJoin = false
-    ): array {
-        /**
-         * @var TableModel $model
-         */
-        $model = new $this->model();
+    public function fetch(Builder $builder): array
+    {
         $data = [];
         $cache = [];
-        if ($cacheTtl > 0) {
+        if ($builder->cacheTtl > 0) {
             $cache = [
                 'cache' => [
-                    'ttl' => $cacheTtl,
-                    'cache_joins' => $cacheJoin
+                    'ttl' => $builder->cacheTtl,
+                    'cache_joins' => $builder->cacheJoin
                 ]
             ];
         }
-        $query = $this->getEntityClass()::getList(
+        $query = $this->modelEntity::getList(
             array_merge(
                 [
-                    'filter' => $filter,
-                    'select' => $select,
-                    'order' => $order,
-                    'limit' => $limit,
-                    'offset' => $offset
+                    'filter' => $builder->getFilter(),
+                    'select' => $builder->getSelect(),
+                    'order' => $builder->getOrder(),
+                    'limit' => $builder->getLimit(),
+                    'offset' => $builder->getOffset(),
                 ],
                 $cache
             )
@@ -87,8 +82,8 @@ final class TableModelQuery
              * @var EntityObject $element
              * @var TableModel $model
              */
-            $model = clone $model;
-            $data[] = $model->setElement($element);
+            $model = new $this->model();
+            $data[] = $model->setElement($model, $element);
         }
 
         return $data;
@@ -102,37 +97,17 @@ final class TableModelQuery
      */
     public function getList(array $parameters = []): QueryResult
     {
-        $entity = $this->getEntityClass();
-
-        return $entity::getList($parameters);
+        return $this->modelEntity::getList($parameters);
     }
 
     /**
      * Фасет GetCount
-     * @param array $filter
+     * @param Builder $builder
      * @return int
      * @see DataManager::getCount()
      */
-    public function count(array $filter = []): int {
-        $entity = $this->getEntityClass();
-
-        return $entity::getCount($filter);
-    }
-
-    /**
-     * Получение экземпляра класса
-     * @return DynamicTable
-     */
-    private function getEntityClass(): DynamicTable
+    public function count(Builder $builder): int
     {
-        /**
-         * @var TableModel $model
-         */
-        $model = new $this->model();
-        $entity = new DynamicTable();
-        $entity::$tableName = $model::getTableName();
-        $entity::$map = $model::getMap();
-
-        return $entity;
+        return $this->modelEntity::getCount($builder->getFilter());
     }
 }

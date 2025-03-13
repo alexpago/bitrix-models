@@ -4,12 +4,16 @@ namespace #NAMESPACE#;
 
 use Pago\Bitrix\Models\HlModel;
 use Bitrix\Main\Type\DateTime;
+use Pago\Bitrix\Models\Queries\Builder;
 
 /**
  * HighloadBlock - #NAME#
  * @property int ID
 #PROPERTIES#
- * @method $this whereId(mixed $data, string $operator = '') // ID
+ * @method static Builder|$this query()
+ * @method Builder|$this get()
+ * @method Builder|$this first()
+ * @method Builder|$this whereId(mixed $data, string $operator = '') // ID
 #METHODS#
  */
 class #NAME# extends HlModel

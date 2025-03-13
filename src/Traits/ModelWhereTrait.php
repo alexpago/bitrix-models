@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace Pago\Bitrix\Models\Traits;
 
+use Bitrix\Main\DB\SqlExpression;
+
 /**
  * Вспомогательные методы построителя фильтрации
  */
@@ -21,9 +23,79 @@ trait ModelWhereTrait
             $data = $operator;
             $operator = '=';
         }
-        $this->queryFilter[$operator . $property] = $data;
+        $this->filter[$operator . $property] = $data;
 
         return $this;
+    }
+
+    /**
+     * @param string $property
+     * @param array $values
+     * @return $this
+     */
+    public function whereIn(string $property, array $values): static
+    {
+        return $this->where($property, '=', $values);
+    }
+
+    /**
+     * @param string $property
+     * @param array $values
+     * @return $this
+     */
+    public function orWhereIn(string $property, array $values): static
+    {
+        return $this->orWhere($property, $values);
+    }
+
+    /**
+     * @param string $property
+     * @param string $property2
+     * @return $this
+     */
+    public function whereProperty(string $property, string $property2): static
+    {
+        return $this->where($property, new SqlExpression($property2));
+    }
+
+    /**
+     * @param string $property
+     * @param string $property2
+     * @return $this
+     */
+    public function orWhereProperty(string $property, string  $property2): static
+    {
+        return $this->orWhere($property, new SqlExpression($property2));
+    }
+
+    /**
+     * @param string $column
+     * @param string $column2
+     * @return $this
+     */
+    public function whereColumn(string $column, string  $column2): static
+    {
+        return $this->where($column, new SqlExpression($column2));
+    }
+
+    /**
+     * @param string $column
+     * @param string $column2
+     * @return $this
+     */
+    public function orWhereColumn(string $column, string  $column2): static
+    {
+        return $this->orWhere($column, new SqlExpression($column2));
+    }
+
+    /**
+     * @param string $property
+     * @param array $values
+     * @return $this
+     */
+    public function whereNotIn(string $property, array $values): static
+    {
+        return $this->where($property, '!', $values);
     }
 
     /**
@@ -41,13 +113,13 @@ trait ModelWhereTrait
         }
 
         // Фильтр пустой, заполнять нечем
-        if (! $this->queryFilter) {
+        if (! $this->filter) {
             return $this->where($property, $operator, $data);
         }
-        $lastFilterKey = array_key_last($this->queryFilter);
-        $lastFilterValue = end($this->queryFilter);
+        $lastFilterKey = array_key_last($this->filter);
+        $lastFilterValue = end($this->filter);
         if (! $lastFilterValue) {
-            $this->queryFilter[$operator . $property] = $data;
+            $this->filter[$operator . $property] = $data;
 
             return $this;
         }
@@ -58,15 +130,15 @@ trait ModelWhereTrait
             && $lastFilterValue['LOGIC'] === 'OR'
         ) {
             // Дополним существующий or фильтр новым значением
-            $this->queryFilter[$lastFilterKey][] = [
+            $this->filter[$lastFilterKey][] = [
                 $operator . $property => $data
             ];
 
             return $this;
         }
         // Filter or отсутствует
-        unset($this->queryFilter[$lastFilterKey]);
-        $this->queryFilter[] = [
+        unset($this->filter[$lastFilterKey]);
+        $this->filter[] = [
             'LOGIC' => 'OR',
             [
                 $lastFilterKey => $lastFilterValue
@@ -86,7 +158,7 @@ trait ModelWhereTrait
      */
     public function whereNotNull(string $property): static
     {
-        $this->queryFilter['!' . $property] = null;
+        $this->filter['!' . $property] = null;
 
         return $this;
     }
@@ -98,8 +170,30 @@ trait ModelWhereTrait
      */
     public function whereNull(string $property): static
     {
-        $this->queryFilter['=' . $property] = null;
+        $this->filter['=' . $property] = null;
 
         return $this;
+    }
+
+    /**
+     * @param string $property
+     * @param $min
+     * @param $max
+     * @return $this
+     */
+    public function whereBetween(string $property, $min, $max): static
+    {
+        return $this->where($property, '><', [$min, $max]);
+    }
+
+    /**
+     * @param string $property
+     * @param $min
+     * @param $max
+     * @return $this
+     */
+    public function whereNotBetween(string $property, $min, $max): static
+    {
+        return $this->where($property, '!><', [$min, $max]);
     }
 }

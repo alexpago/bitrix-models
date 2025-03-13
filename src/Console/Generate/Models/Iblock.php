@@ -3,11 +3,11 @@ declare(strict_types=1);
 
 namespace Pago\Bitrix\Models\Console\Generate\Models;
 
-use Bitrix\Iblock\IblockTable;
 use Bitrix\Main\SystemException;
 use Pago\Bitrix\Models\Console\Generate\GenerateResult;
 use Pago\Bitrix\Models\Helpers\Helper;
 use Pago\Bitrix\Models\Helpers\IModelHelper;
+use Pago\Bitrix\Models\Models\IblockTable;
 
 /**
  * Генерация моделей для инфоблоков
@@ -15,21 +15,30 @@ use Pago\Bitrix\Models\Helpers\IModelHelper;
 class Iblock extends Base
 {
     /**
-     * @var string
+     * @var IblockTable
      */
-    private string $layoutMethodProperty = '@method %s get%s() // %s';
+    private IblockTable $iblock;
 
     /**
      * @param int $id ID инфоблока
      * @param string|null $path Директория модели
      * @param string|null $namespace Namespace модели
+     * @throws SystemException
      */
     public function __construct(
         int     $id,
         ?string $path = null,
-        ?string $namespace = null)
+        ?string $namespace = null
+    )
     {
         $this->id = $id;
+        $iblock = IblockTable::query()->whereId($id)->first();
+        if (! $iblock) {
+            throw new SystemException('Ошибка. Не найден инфоблок ' . $id);
+        }
+        $this->iblock = $iblock;
+
+        // Пути модели
         $this->pathModels = $this->getModelPath($path, 'iblock');
         $this->namespace = $namespace ?: $this->defaultModeNamespace . '\\Iblock';
         $this->model = file_get_contents(__DIR__ . '/../Layouts/iblock');
@@ -49,20 +58,13 @@ class Iblock extends Base
         $model = str_replace('#NAME#', $data->name, $model);
 
         // Генерация документации
-        $properties = $propertyMethods = $methods = '';
+        $properties =  $methods = '';
         foreach (IModelHelper::getIblockProperties($this->id) as $property) {
             $code = Helper::snakeToCamelCase($property['CODE'], true);
             if ('' !== $properties) {
-                $propertyMethods .= PHP_EOL;
                 $properties .= PHP_EOL;
                 $methods .= PHP_EOL;
             }
-            $propertyMethods .= ' * ' . sprintf(
-                    $this->layoutMethodProperty,
-                    $this->getMethodPropertyReturnType($property['PROPERTY_TYPE'], $property['MULTIPLE'] === 'Y'),
-                    $code,
-                    ucfirst($property['NAME'])
-                );
             $properties .= ' * ' . sprintf(
                     $this->layoutProperty,
                     $this->getPropertyReturnType($property['PROPERTY_TYPE'], $property['MULTIPLE'] === 'Y'),
@@ -77,7 +79,7 @@ class Iblock extends Base
                 );
         }
 
-        $model = str_replace('#PROPERTIES#', $propertyMethods . $properties, $model);
+        $model = str_replace('#PROPERTIES#', $properties, $model);
         $model = str_replace('#METHODS#', $methods, $model);
         $data->success = $this->createModelFile($data->path, $model);
 
@@ -86,25 +88,24 @@ class Iblock extends Base
 
     /**
      * Установка API_CODE инфоблоку
-     * @param  string|null  $apiCode
+     * @param string|null $apiCode
      * @return bool
      */
     public function setApiCode(?string $apiCode = null): bool
     {
-        $iblock = $this->getIblock();
-        if (null !== $iblock['API_CODE']) {
+        if ($this->iblock->API_CODE) {
             return true;
         }
-
-        $code = $apiCode ?? $iblock['CODE'];
+        $code = $apiCode ?? $this->iblock->CODE;
         if (! $code) {
-            $code = 'iblock' . $iblock['ID'];
+            $code = 'iblock' . $this->iblock->ID;
         }
-        $update = IblockTable::update($iblock['ID'], [
-            'API_CODE' => Helper::snakeToCamelCase($code, true)
-        ]);
 
-        return $update->isSuccess();
+        return $this->iblock->update([
+            'API_CODE' => Helper::getOnlyAlphaNumeric(
+                Helper::snakeToCamelCase($code, true)
+            ),
+        ])->isSuccess();
     }
 
     /**
@@ -115,88 +116,40 @@ class Iblock extends Base
      */
     protected function getPropertyReturnType(string $type, bool $multiple): string
     {
-        if ($multiple) {
-            return 'array';
-        }
-
-        return 'string';
+        return $multiple ? 'array' : 'string';
     }
 
     /**
      * Сбор информации для генерации модели
      * @return GenerateResult
-     * @throws SystemException
      */
     private function getModelData(): GenerateResult
     {
-        $iblock = $this->getIblock();
         $warnings = [];
-        if (empty($iblock['CODE'])) {
+        if (! $this->iblock->CODE) {
             $warnings[] = 'У инфоблока отсутствует символьный код. Рекомендуется установить его';
         }
-        $code = $iblock['CODE'];
-        if (! $code) {
-            $code = 'iblock' . $iblock['ID'];
+        $name = $this->iblock->CODE;
+        if ($name && ! Helper::isSnakeCaseString($name)) {
+            $warnings[] = 'Инфоблок содержит код не в формате snake_case. Разрешенные символы a-z_';
         }
-        $code = Helper::snakeToCamelCase($code, true);
+        if (! Helper::isSnakeCaseString($name)) {
+            $name = 'iblock' . $this->iblock->ID;
+        }
+        $name = Helper::snakeToCamelCase($name, true);
         $filename = sprintf(
             '%s.php',
-            strtolower(Helper::getOnlyAlphaNumeric($code))
+            strtolower(Helper::getOnlyAlphaNumeric($name))
         );
         $path = $this->pathModels . '/' . $filename;
         $namespace = $this->namespace;
-
-        /**
-         * TODO: будет актуально при добавлении в модуль
-         */
-//        if (! empty($iblock['IBLOCK_TYPE_ID']) && ! is_numeric($iblock['IBLOCK_TYPE_ID'])) {
-//            $catalog = strtolower(Helper::getOnlyAlphaNumeric($iblock['IBLOCK_TYPE_ID']));
-//            $namespace .= sprintf('\\%s', Helper::snakeToCamelCase($iblock['IBLOCK_TYPE_ID'], true));
-//            $path = $this->pathModels . '/' . $catalog . '/' . $filename;
-//        }
 
         return new GenerateResult(
             path: $path,
             filename: $filename,
             namespace: $namespace,
-            name: $code,
+            name: $name,
             warnings: $warnings
         );
-    }
-
-    /**
-     * @return array
-     * @throws SystemException
-     */
-    private function getIblock(): array
-    {
-        return IblockTable::query()
-            ->setSelect([
-                'ID',
-                'IBLOCK_TYPE_ID',
-                'NAME',
-                'CODE',
-                'API_CODE',
-                'VERSION'
-            ])
-            ->setFilter([
-                '=ID' => $this->id
-            ])
-            ->fetch();
-    }
-
-    /**
-     * Возвращаемый тип свойства полученным через метод
-     * @param  string  $type
-     * @param  bool  $multiple
-     * @return string
-     */
-    private function getMethodPropertyReturnType(string $type, bool $multiple): string
-    {
-        if ($multiple) {
-            return 'Collection';
-        }
-
-        return 'ValueStorage';
     }
 }

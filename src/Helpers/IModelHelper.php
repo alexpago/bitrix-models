@@ -3,9 +3,9 @@ declare(strict_types=1);
 
 namespace Pago\Bitrix\Models\Helpers;
 
+use Bitrix\Iblock\ElementTable;
 use Bitrix\Iblock\IblockTable;
 use Bitrix\Iblock\PropertyTable;
-use Bitrix\Main\SystemException;
 
 /**
  * Статические методы для взаимодействия с моделями инфоблоков
@@ -15,7 +15,7 @@ final class IModelHelper
     /**
      * @var array
      */
-    private static array $blocks = [];
+    private static array $cacheIBlocks = [];
 
     /**
      * @var array
@@ -30,6 +30,29 @@ final class IModelHelper
     public static function getIblockPropertyCodes(int $id): array
     {
         return array_column(self::getIblockProperties($id), 'CODE');
+    }
+
+    /**
+     * Поле является базовым инфоблока
+     * @param string $field
+     * @return bool
+     */
+    public static function isBaseField(string $field): bool
+    {
+        return in_array(strtoupper($field), array_keys(
+            (new ElementTable())->getEntity()->getFields()
+        ));
+    }
+
+    /**
+     * Поле является свойством инфоблока
+     * @param int $iblockId
+     * @param string $property
+     * @return bool
+     */
+    public static function isProperty(int $iblockId, string $property): bool
+    {
+        return in_array($property, self::getIblockPropertyCodes($iblockId));
     }
 
     /**
@@ -66,37 +89,51 @@ final class IModelHelper
     }
 
     /**
+     * Получить информацию об инфоблоке по коду
+     * @param string $code
+     * @return array|null
+     */
+    public static function getIblockDataByCode(string $code): ?array
+    {
+        $iblocks = self::getIblocks();
+        $search = array_search($code, array_column($iblocks, 'CODE'));
+        if ($search === false) {
+            return null;
+        }
+        return $iblocks[$search];
+    }
+
+    /**
      * Идентификатор инфоблока по символьному коду
      * @param string $code
-     * @return int
+     * @return int|null
      */
-    public static function getIblockIdByCode(string $code): int
+    public static function getIblockIdByCode(string $code,): ?int
     {
-        if (! self::$blocks) {
-            $blocks = IblockTable::query()
-                ->setSelect([
-                    'ID',
-                    'CODE',
-                    'API_CODE',
-                ])
+        $iblock = self::getIblockDataByCode($code);
+        return $iblock ? (int)$iblock['ID'] : null;
+    }
+
+    /**
+     * @return void
+     */
+    public static function clearIblockModelCache(): void
+    {
+        self::$cacheIBlocks = [];
+    }
+
+    /**
+     * Загрузить список инфоблоков
+     * @param bool $refreshCache
+     * @return array
+     */
+    private static function getIblocks(bool $refreshCache = false): array
+    {
+        if (! self::$cacheIBlocks || $refreshCache) {
+            self::$cacheIBlocks = IblockTable::query()
+                ->setSelect(['*'])
                 ->fetchAll();
-
-            array_map(function (array $value) {
-                self::$blocks[] = $value;
-            }, $blocks);
         }
-        $search = array_search(
-            $code,
-            array_column(self::$blocks, 'CODE')
-        );
-        if (false === $search) {
-            throw new SystemException(sprintf('Инфоблок с кодом %s не найден', $code));
-        }
-        $block = self::$blocks[$search];
-        if (null === $block['API_CODE']) {
-            throw new SystemException(sprintf('API_CODE инфоблока %s не указан. Заполните API_CODE', $code));
-        }
-
-        return (int)$block['ID'];
+        return self::$cacheIBlocks;
     }
 }
