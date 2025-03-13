@@ -12,13 +12,13 @@ trait ModelBaseTrait
      * Загрузить properties для инфоблоков
      * @var bool
      */
-    public bool $withProperties = false;
+    protected bool $withProperties = false;
 
     /**
      * Загрузить ссылку на детальную страницу для инфоблоков
      * @var bool
      */
-    public bool $withDetailPageUrl = false;
+    protected bool $withDetailPageUrl = false;
 
     /**
      * @return $this
@@ -158,6 +158,22 @@ trait ModelBaseTrait
         $this->cacheTtl = 0;
         return $this;
     }
+
+    /**
+     * @return int
+     */
+    public function getCacheTtl(): int
+    {
+        return $this->cacheTtl;
+    }
+
+    /**
+     * @return bool
+     */
+    public function getCacheJoin(): bool
+    {
+        return $this->cacheJoin;
+    }
     
     /**
      * @param array $order
@@ -211,6 +227,14 @@ trait ModelBaseTrait
     }
 
     /**
+     * @return bool
+     */
+    public function getWithProperties(): bool
+    {
+        return $this->withProperties;
+    }
+
+    /**
      * Получить элементы с загрузкой детальной страницы (для инфоблоков)
      * @return $this
      */
@@ -218,5 +242,13 @@ trait ModelBaseTrait
     {
         $this->withDetailPageUrl = true;
         return $this;
+    }
+
+    /**
+     * @return bool
+     */
+    public function getWithDetailPageUrl(): bool
+    {
+        return $this->withDetailPageUrl;
     }
 }

@@ -3,111 +3,40 @@ declare(strict_types=1);
 
 namespace Pago\Bitrix\Models\Queries;
 
-use Bitrix\Highloadblock\DataManager;
-use Bitrix\Main\ORM\Objectify\EntityObject;
-use Bitrix\Main\ORM\Query\Result as QueryResult;
 use Pago\Bitrix\Models\Helpers\DynamicTable;
+use Pago\Bitrix\Models\Interfaces\QueryableInterface;
 use Pago\Bitrix\Models\TableModel;
 
 /**
  * Запросы к таблицам
  */
-final class TableModelQuery
+final class TableModelQuery extends BaseQuery implements QueryableInterface
 {
-    /**
-     * Класс модели
-     * @var string
-     */
-    private string $model;
-
     /**
      * @var DynamicTable
      */
-    private DynamicTable $modelEntity;
+    protected DynamicTable $modelEntity;
 
     /**
      * @param string $model Класс модели
      */
     public function __construct(string $model)
     {
-        $this->model = $model;
         /**
-         * @var TableModel $model
+         * @var TableModel $entity
          */
-        $model = new $this->model();
+        $entity = new $model;
         $this->modelEntity = new DynamicTable();
-        $this->modelEntity::$tableName = $model::getTableName();
-        $this->modelEntity::$map = $model::getMap();
+        $this->modelEntity::$tableName = $entity::getTableName();
+        $this->modelEntity::$map = $entity::getMap();
+        parent::__construct($model);
     }
 
     /**
-     * @param string $model Класс модели
-     * @return self
+     * @return DynamicTable
      */
-    public static function instance(string $model): self
+    public function getEntity()
     {
-        return new self($model);
-    }
-
-    /**
-     * @param Builder $builder
-     * @return TableModel[]
-     */
-    public function fetch(Builder $builder): array
-    {
-        $data = [];
-        $cache = [];
-        if ($builder->cacheTtl > 0) {
-            $cache = [
-                'cache' => [
-                    'ttl' => $builder->cacheTtl,
-                    'cache_joins' => $builder->cacheJoin
-                ]
-            ];
-        }
-        $query = $this->modelEntity::getList(
-            array_merge(
-                [
-                    'filter' => $builder->getFilter(),
-                    'select' => $builder->getSelect(),
-                    'order' => $builder->getOrder(),
-                    'limit' => $builder->getLimit(),
-                    'offset' => $builder->getOffset(),
-                ],
-                $cache
-            )
-        );
-        foreach ($query->fetchCollection() as $element) {
-            /**
-             * @var EntityObject $element
-             * @var TableModel $model
-             */
-            $model = new $this->model();
-            $data[] = $model->setElement($model, $element);
-        }
-
-        return $data;
-    }
-
-    /**
-     * Фасет GetList
-     * @param array $parameters
-     * @return QueryResult
-     * @see DataManager::getList()
-     */
-    public function getList(array $parameters = []): QueryResult
-    {
-        return $this->modelEntity::getList($parameters);
-    }
-
-    /**
-     * Фасет GetCount
-     * @param Builder $builder
-     * @return int
-     * @see DataManager::getCount()
-     */
-    public function count(Builder $builder): int
-    {
-        return $this->modelEntity::getCount($builder->getFilter());
+        return $this->modelEntity;
     }
 }
