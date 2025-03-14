@@ -5,15 +5,16 @@ namespace Pago\Bitrix\Models;
 
 use Bitrix\Highloadblock\DataManager;
 use Bitrix\Iblock\ORM\CommonElementTable;
-use Bitrix\Main\ArgumentException;
 use Bitrix\Main\DB\Exception;
 use Bitrix\Main\Error;
 use Bitrix\Main\ORM\Data\Result;
+use Bitrix\Main\ORM\Objectify\EntityObject;
+use Bitrix\Main\ORM\Query\Result as QueryResult;
 use Bitrix\Main\SystemException;
 use Pago\Bitrix\Models\Helpers\DynamicTable;
 use Pago\Bitrix\Models\Helpers\IModelHelper;
+use Pago\Bitrix\Models\Interfaces\QueryableInterface;
 use Pago\Bitrix\Models\Queries\Builder;
-use CIBlockElement;
 
 /**
  * Базовый класс моделей
@@ -45,35 +46,21 @@ abstract class BaseModel
     public ?Builder $builder = null;
 
     /**
-     * Получение данных массивом
-     * @return array|null
-     */
-    abstract function toArray(): ?array;
-
-    /**
      * Получение экземпляра класса
      * @return CommonElementTable|DataManager|DynamicTable|null
      */
     abstract static function getEntity(): CommonElementTable|DataManager|DynamicTable|null;
 
     /**
-     * Результат запроса
-     * @param Builder $builder
-     * @return array<static>
-     */
-    abstract static function get(Builder $builder): array;
-
-    /**
-     * Количество элементов
-     * @param Builder $builder
-     * @return int
-     */
-    abstract public static function count(Builder $builder): int;
-
-    /**
      * @return mixed
      */
     abstract public function element(): mixed;
+
+    /**
+     * @param Builder $queryBuilder
+     * @return QueryableInterface
+     */
+    abstract static protected function getQuery(Builder $queryBuilder): QueryableInterface;
 
     /**
      * Инициализация запроса
@@ -91,7 +78,7 @@ abstract class BaseModel
      */
     final public static function insert(array $data): array
     {
-        if (! array_is_list($data)) {
+        if (!array_is_list($data)) {
             $data = [$data];
         }
         $result = [];
@@ -117,6 +104,16 @@ abstract class BaseModel
     }
 
     /**
+     * Фасет GetList
+     * @param array $parameters
+     * @return QueryResult
+     */
+    final public static function getList(array $parameters = []): QueryResult
+    {
+        return static::getEntity()::getList($parameters);
+    }
+
+    /**
      * Результат запроса в виде массива
      * @param Builder $builder
      * @return array<static>
@@ -131,6 +128,51 @@ abstract class BaseModel
     }
 
     /**
+     * Элементы данных
+     * @param Builder $queryBuilder
+     * @return array<static>
+     */
+    public static function get(Builder $queryBuilder): array
+    {
+        return static::getQuery($queryBuilder)->fetch();
+    }
+
+    /**
+     * Количество элементов
+     * @param Builder|null $queryBuilder
+     * @return int
+     */
+    public static function count(Builder|null $queryBuilder = null): int
+    {
+        if (! $queryBuilder) {
+            $queryBuilder = new Builder(new static());
+        }
+        return static::getQuery($queryBuilder)->count();
+    }
+
+    /**
+     * @param BaseModel $model
+     * @param EntityObject $element
+     * @param Builder $builder
+     * @return $this
+     */
+    public static function setElement(
+        BaseModel    $model,
+        EntityObject $element,
+        Builder      $builder
+    ): static
+    {
+        $model->builder = $builder;
+        $model->modelElement = $element;
+        try {
+            $model->originalProperties = $element->collectValues();
+            $model->fill($model->originalProperties);
+        } catch (SystemException) {
+        }
+        return $model;
+    }
+
+    /**
      * @param array $data
      * @return $this
      */
@@ -139,7 +181,6 @@ abstract class BaseModel
         foreach ($data as $parameter => $value) {
             $this->properties[$parameter] = $value;
         }
-
         return $this;
     }
 
@@ -160,7 +201,6 @@ abstract class BaseModel
         if ($element) {
             $this->fill($element->toArray());
         }
-
         return $this;
     }
 
@@ -208,12 +248,21 @@ abstract class BaseModel
     }
 
     /**
-     * Получить primary
+     * Получить primary - значение
      * @return string|int|null
      */
     public function getPrimary(): string|int|null
     {
         return $this->getPrimaryKey() ? ($this->{$this->getPrimaryKey()} ?? null) : null;
+    }
+
+    /**
+     * Получить primary - значение (аналог getPrimary)
+     * @return string|int|null
+     */
+    public function getPrimaryValue(): string|int|null
+    {
+        return $this->getPrimary();
     }
 
     /**
@@ -272,7 +321,7 @@ abstract class BaseModel
                     // Базовое поле сохраним обычно
                     if (IModelHelper::isBaseField($property)) {
                         $this->element()->set($property, $value);
-                    } elseif(IModelHelper::isProperty($iblockId, $property)) {
+                    } elseif (IModelHelper::isProperty($iblockId, $property)) {
                         // Свойство инфоблока
                         $iblockProperties[$property] = $value;
                     }
@@ -345,25 +394,26 @@ abstract class BaseModel
     }
 
     /**
-     * Обновление элемента модели или элементов запроса.
+     * Обновление элемента модели
      * @param array $data
+     * @param bool $callEvents
      * @return Result
      */
-    public function update(array $data): Result
+    public function update(array $data, bool $callEvents = true): Result
     {
         if (! $this->exists()) {
             return new Result();
         }
-        return $this->fill($data)->save();
+        return $this->fill($data)->save($callEvents);
     }
 
     /**
      * Сохранение элемента и его получение
      * @return $this
      */
-    public function put(): static
+    public function put(bool $callEvents = true): static
     {
-        $save = $this->save();
+        $save = $this->save($callEvents);
         if (! $save->isSuccess()) {
             return $this;
         }
@@ -375,21 +425,26 @@ abstract class BaseModel
 
     /**
      * Удаление элемента модели
+     * @param bool $callEvents
      * @return Result
      */
-    public function delete(): Result
+    public function delete(bool $callEvents = true): Result
     {
         if (! $this->exists()) {
             return new Result();
         }
-        $this->onBeforeDelete();
+        if ($callEvents) {
+            $this->onBeforeDelete();
+        }
         try {
             $result = $this->element()->delete();
         } catch (\Exception $e) {
             $result = new Result();
             $result->addError(Error::createFromThrowable($e));
         }
-        $this->onAfterDelete($result);
+        if ($callEvents) {
+            $this->onAfterDelete($result);
+        }
         return $result;
     }
 
@@ -401,6 +456,16 @@ abstract class BaseModel
     public function elementDelete(): bool
     {
         return $this->delete()->isSuccess();
+    }
+
+
+    /**
+     * Преобразование ответа в массив
+     * @return array|null
+     */
+    public function toArray(): ?array
+    {
+        return $this->getProperties();
     }
 
     /**
@@ -416,14 +481,9 @@ abstract class BaseModel
      * Получить статические свойства
      * @return array
      */
-    public function getStaticProperties(): array
+    public function getUnmodifiable(): array
     {
-        $properties = [];
-        // DETAIL_PAGE_URL вычисляемое значение для инфоблока
-        if ($this instanceof IModel) {
-            $properties[] = 'DETAIL_PAGE_URL';
-        }
-        return $properties;
+        return [];
     }
 
     /**
@@ -434,7 +494,7 @@ abstract class BaseModel
     {
         $properties = [];
         foreach ($this->properties as $property => $value) {
-            if (! isset($this->originalProperties[$property])) {
+            if (!isset($this->originalProperties[$property])) {
                 $properties[$property] = $value;
                 continue;
             }
@@ -444,7 +504,7 @@ abstract class BaseModel
         }
         return array_diff_key(
             $properties,
-            array_flip($this->getStaticProperties())
+            array_flip($this->getUnmodifiable())
         );
     }
 

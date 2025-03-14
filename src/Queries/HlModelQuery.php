@@ -19,20 +19,21 @@ final class HlModelQuery extends BaseQuery implements QueryableInterface
     private DataManager $modelEntity;
 
     /**
-     * @param string $model Класс модели
+     * @param string $modelClass
+     * @param Builder $queryBuilder
      * @throws SystemException
      */
-    public function __construct(string $model)
+    public function __construct(string $modelClass, Builder $queryBuilder)
     {
         /**
          * @var HlModel $entity
          */
-        $entity = new $model();
+        $entity = new $modelClass();
         if (! $entity instanceof HlModel) {
             throw new SystemException('Model query must be instance of HlModel');
         }
         $this->modelEntity = new ($entity::getEntityClass());
-        parent::__construct($model);
+        parent::__construct($modelClass, $queryBuilder);
     }
 
     /**

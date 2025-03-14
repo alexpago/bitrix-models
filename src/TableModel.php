@@ -4,19 +4,21 @@ declare(strict_types=1);
 namespace Pago\Bitrix\Models;
 
 use Bitrix\Main\ORM\Objectify\EntityObject;
-use Bitrix\Main\SystemException;
 use Pago\Bitrix\Models\Helpers\DynamicTable;
 use Pago\Bitrix\Models\Helpers\Helper;
 use Pago\Bitrix\Models\Helpers\TableModelHelper;
+use Pago\Bitrix\Models\Interfaces\HighloadTableInterface;
+use Pago\Bitrix\Models\Interfaces\ModelInterface;
+use Pago\Bitrix\Models\Interfaces\QueryableInterface;
 use Pago\Bitrix\Models\Queries\Builder;
 use Pago\Bitrix\Models\Queries\TableModelQuery;
 use Pago\Bitrix\Models\Traits\ModelBaseTrait;
 use Pago\Bitrix\Models\Traits\ModelWhereTrait;
 
 /**
- * Модель для таблиц
+ * Модель таблицы
  */
-abstract class TableModel extends BaseModel
+abstract class TableModel extends BaseModel implements ModelInterface, HighloadTableInterface
 {
     use ModelBaseTrait;
     use ModelWhereTrait;
@@ -35,9 +37,11 @@ abstract class TableModel extends BaseModel
      */
     public static function getTableName(): string
     {
+        // Определение таблицы по имени
         if (static::TABLE_NAME) {
             return static::TABLE_NAME;
         }
+        // Определение таблицы по классу
         $class = explode('\\', get_called_class());
         return Helper::camelToSnakeCase((string)end($class));
     }
@@ -49,7 +53,6 @@ abstract class TableModel extends BaseModel
     public static function getMap(): array
     {
         $helper = new TableModelHelper();
-
         return $helper->getMap(static::getTableName());
     }
 
@@ -67,52 +70,16 @@ abstract class TableModel extends BaseModel
     }
 
     /**
-     * @param Builder $builder
-     * @return array|static[]
+     * @param Builder $queryBuilder
+     * @return QueryableInterface
      */
-    public static function get(Builder $builder): array
+    static protected function getQuery(Builder $queryBuilder): QueryableInterface
     {
-        return TableModelQuery::instance(static::class)->fetch($builder);
+        return new TableModelQuery(static::class, $queryBuilder);
     }
 
     /**
-     * @param EntityObject $element
-     * @return $this
-     */
-    public static function setElement(TableModel $model, EntityObject $element): static
-    {
-        $model->modelElement = $element;
-        try {
-            $model->originalProperties = $element->collectValues();
-            $model->fill($model->originalProperties);
-        } catch (SystemException) {
-        }
-        return $model;
-    }
-
-    /**
-     * Количество элементов в БД
-     * @param Builder|null $builder
-     * @return int
-     */
-    public static function count(?Builder $builder = null): int
-    {
-        if (! $builder) {
-            $builder = new Builder(new static());
-        }
-        return TableModelQuery::instance(static::class)->count($builder);
-    }
-
-    /**
-     * Перевод в массив
-     * @return array|null
-     */
-    public function toArray(): ?array
-    {
-        return $this->getProperties();
-    }
-
-    /**
+     * TODO: Перенести в BaseModel
      * @return EntityObject|null
      */
     public function element(): EntityObject|null

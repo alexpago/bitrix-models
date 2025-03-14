@@ -6,6 +6,9 @@ namespace Pago\Bitrix\Models\Helpers;
 use Bitrix\Iblock\ElementTable;
 use Bitrix\Iblock\IblockTable;
 use Bitrix\Iblock\PropertyTable;
+use Pago\Bitrix\Models\Cache\CacheService;
+use Pago\Bitrix\Models\IModel;
+use CIBlockElement;
 
 /**
  * Статические методы для взаимодействия с моделями инфоблоков
@@ -108,7 +111,7 @@ final class IModelHelper
      * @param string $code
      * @return int|null
      */
-    public static function getIblockIdByCode(string $code,): ?int
+    public static function getIblockIdByCode(string $code): ?int
     {
         $iblock = self::getIblockDataByCode($code);
         return $iblock ? (int)$iblock['ID'] : null;
@@ -135,5 +138,122 @@ final class IModelHelper
                 ->fetchAll();
         }
         return self::$cacheIBlocks;
+    }
+
+    /**
+     * Получить свойства инфоблока
+     * @param IModel|int|array $elements
+     * @param int $iblockId
+     * @param array $codes
+     * @param int $cacheTtl
+     * @return array
+     */
+    public static function getProperties(
+        IModel|int|array $elements,
+        int              $iblockId,
+        array            $codes = [],
+        int              $cacheTtl = 0
+    ): array
+    {
+        // Шаг 1: Соберем список идентификаторов элементов
+        if (! ($elementIds = self::collectElementIds($elements))) {
+            return [];
+        }
+        // Шаг 2: Кэширование. Проверка существования кэша
+        $cacheKey = md5(serialize($elementIds)) . '-properties';
+        if (null !== ($cache = CacheService::instance()->getIblockCache($iblockId, $cacheKey, $cacheTtl))) {
+            return $cache;
+        }
+        // Шаг 3: Собираем информацию в виде массива свойств
+        $result = [];
+        CIBlockElement::GetPropertyValuesArray(
+            result: $result,
+            iblockID: $iblockId,
+            filter: [
+                'ID' => $elementIds
+            ],
+            propertyFilter: [
+                'CODE' => $codes
+            ]
+        );
+        // Шаг 4: Запишем кэш
+        if ($cacheTtl) {
+            CacheService::instance()->setIblockCache(
+                iblockId: $iblockId,
+                cacheKey: $cacheKey,
+                data: $result,
+                ttl: $cacheTtl
+            );
+        }
+        return $result;
+    }
+
+    /**
+     * Получение детальной страницы URL
+     * @param IModel|int|array $elements
+     * @param int $iblockId
+     * @param int $cacheTtl
+     * @return array<string>
+     */
+    public static function getDetailPageUrl(
+        IModel|int|array $elements,
+        int              $iblockId,
+        int              $cacheTtl = 0
+    ): array
+    {
+        // Шаг 1: Соберем список идентификаторов элементов
+        if (! ($elementIds = self::collectElementIds($elements))) {
+            return [];
+        }
+        // Шаг 2: Кэширование. Проверка существования кэша
+        $cacheKey = md5(serialize($elements)) . '-detail-page-url';
+        if (null !== ($cache = CacheService::instance()->getIblockCache($iblockId, $cacheKey, $cacheTtl))) {
+            return $cache;
+        }
+        // Шаг 3: Собираем информацию в виде массива свойств
+        $result = [];
+        $elements = CIBlockElement::getList(
+            arFilter: [
+                '=ID' => $elementIds,
+            ],
+            arSelectFields: [
+                'ID',
+                'DETAIL_PAGE_URL'
+            ]
+        );
+        while ($element = $elements->GetNext()) {
+            $result[(int)$element['ID']] = $element['DETAIL_PAGE_URL'];
+        }
+        // Шаг 4: Запишем кэш
+        if ($cacheTtl) {
+            CacheService::instance()->setIblockCache(
+                iblockId: $iblockId,
+                cacheKey: $cacheKey,
+                data: $result,
+                ttl: $cacheTtl
+            );
+        }
+        return $result;
+    }
+
+    /**
+     * Собрать ID элементов из переданного значения
+     * @param IModel|int|array $elements
+     * @return array
+     */
+    private static function collectElementIds(IModel|int|array $elements): array
+    {
+        $elementIds = [];
+        $elements = (array)$elements;
+        if (array_is_list($elements)) {
+            foreach ($elements as $element) {
+                if (is_numeric($element)) {
+                    $elementIds[] = (int)$element;
+                } elseif ($element instanceof IModel && $element->ID) {
+                    $elementIds[] = $element->ID;
+                }
+            }
+        }
+        return array_unique(array_filter($elementIds));
     }
 }

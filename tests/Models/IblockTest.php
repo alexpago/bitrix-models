@@ -265,6 +265,7 @@ final class IblockTest extends TestCase
 
         $element = TestIblockModel::query()
             ->withProperties()
+            ->withDetailPageUrl()
             ->select('ID, LABELS')
             ->whereId($elementId)
             ->first();

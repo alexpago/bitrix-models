@@ -44,8 +44,6 @@ final class GenerateModelService
      */
     public function __construct(array $arguments)
     {
-        // Подключаем базовые модули highload, iblock
-        Helper::includeBaseModules();
         // Фильтруем входящие данные
         $this->inputArguments = $arguments;
         array_shift($arguments);

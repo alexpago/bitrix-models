@@ -3,8 +3,6 @@ declare(strict_types=1);
 
 namespace Pago\Bitrix\Models\Helpers;
 
-use Bitrix\Main\Loader;
-
 /**
  * Вспомогательные статические методы
  */
@@ -64,16 +62,6 @@ final class Helper
     public static function getOnlyNumeric(string $input): int
     {
         return (int)preg_replace('/[^0-9]+/i', '', $input);
-    }
-
-    /**
-     * Подключение основных модулей
-     * @return void
-     */
-    public static function includeBaseModules(): void
-    {
-        Loader::includeModule('highloadblock');
-        Loader::includeModule('iblock');
     }
 
     /**

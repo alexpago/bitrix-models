@@ -4,12 +4,10 @@ declare(strict_types=1);
 namespace Pago\Bitrix\Models\Queries;
 
 use Bitrix\Main\SystemException;
-use CIBlockElement;
 use Bitrix\Iblock\ORM\CommonElementTable;
 use Bitrix\Iblock\ORM\ElementV1;
 use Bitrix\Iblock\ORM\ElementV2;
 use Bitrix\Main\ORM\Objectify\EntityObject;
-use Pago\Bitrix\Models\Cache\CacheService;
 use Pago\Bitrix\Models\Helpers\IModelHelper;
 use Pago\Bitrix\Models\IModel;
 use Pago\Bitrix\Models\Interfaces\QueryableInterface;
@@ -25,17 +23,24 @@ final class IModelQuery extends BaseQuery implements QueryableInterface
     protected CommonElementTable $modelEntity;
 
     /**
-     * @param string $model Класс модели
+     * @var int
+     */
+    protected int $iblockId;
+
+    /**
+     * @param string $modelClass
+     * @param Builder $queryBuilder
      * @throws SystemException
      */
-    public function __construct(string $model)
+    public function __construct(string $modelClass, Builder $queryBuilder)
     {
-        $entity = new $model();
+        $entity = new $modelClass();
         if (! $entity instanceof IModel) {
             throw new SystemException('IModelQuery must be instance of IModel');
         }
         $this->modelEntity = $entity::getEntity();
-        parent::__construct($model);
+        $this->iblockId = $entity->getIblockId();
+        parent::__construct($modelClass, $queryBuilder);
     }
 
     /**
@@ -48,10 +53,9 @@ final class IModelQuery extends BaseQuery implements QueryableInterface
 
     /**
      * Получение элементов запроса
-     * @param Builder $builder
      * @return array
      */
-    public function fetch(Builder $builder): array
+    public function fetch(): array
     {
         /**
          * @var array<EntityObject> $elements
@@ -60,7 +64,7 @@ final class IModelQuery extends BaseQuery implements QueryableInterface
         $elements = [];
         $elementIds = [];
         // Шаг 1: Первый запрос на получение системных полей
-        $query = $this->getEntity()::getList($this->collectFetchFilter($builder));
+        $query = $this->getEntity()::getList($this->collectFetchFilter());
         foreach ($query->fetchCollection() as $element) {
             /**
              * @var EntityObject $element
@@ -71,17 +75,23 @@ final class IModelQuery extends BaseQuery implements QueryableInterface
 
         // Шаг 2: Загрузка свойств инфоблока при указании withProperties или наличию свойств в select
         $properties = [];
-        if ($builder->getWithProperties() || $this->hasPropertyFields($builder)) {
-            $properties = $this->getProperties(
-                $builder,
-                $elementIds
+        if ($this->queryBuilder->getWithProperties() || $this->hasPropertyFields()) {
+            $properties = IModelHelper::getProperties(
+                elements: $elementIds,
+                iblockId: $this->iblockId,
+                codes: $this->collectPropertyFields(),
+                cacheTtl: $this->queryBuilder->getCacheTtl()
             );
         }
 
         // Шаг 3: Загрузка детальных ссылок элементов
         $detailPageUrls = [];
-        if ($builder->getWithDetailPageUrl()) {
-            $detailPageUrls = $this->getDetailPageUrl($builder, $elementIds);
+        if ($this->queryBuilder->getWithDetailPageUrl()) {
+            $detailPageUrls = IModelHelper::getDetailPageUrl(
+                elements: $elementIds,
+                iblockId: $this->iblockId,
+                cacheTtl: $this->queryBuilder->getCacheTtl()
+            );
         }
 
         // Шаг 4: Создадим модель для каждого элемента объединив все данные
@@ -92,9 +102,9 @@ final class IModelQuery extends BaseQuery implements QueryableInterface
              * @var IModel $model
              */
             $model = new $this->model();
-            $model = $model::setElement($model, $element, $builder);
+            $model = $model::setElement($model, $element, $this->queryBuilder);
             // Детальная страница элемента
-            if (! empty($detailPageUrls[$model->ID])) {
+            if (!empty($detailPageUrls[$model->ID])) {
                 $model->detailPageUrl = $detailPageUrls[$model->ID];
                 $model->fill([
                     'DETAIL_PAGE_URL' => $detailPageUrls[$model->ID]
@@ -106,117 +116,6 @@ final class IModelQuery extends BaseQuery implements QueryableInterface
             }
             $data[] = $model;
         }
-        return $data;
-    }
-
-    /**
-     * Получить свойства элемента через GetPropertyValuesArray
-     * @param Builder $builder
-     * @param IModel|int|array $elements
-     * @return array
-     */
-    public function getProperties(
-        Builder          $builder,
-        IModel|int|array $elements,
-    ): array
-    {
-        $iblockId = $builder->getModel()->getIblockId();
-        // Соберем список идентификаторов элементов
-        $elementIds = [];
-        $elements = (array)$elements;
-        if (array_is_list($elements)) {
-            foreach ($elements as $element) {
-                if (is_int($element)) {
-                    $elementIds[] = $element;
-                } elseif ($element instanceof IModel && $element->ID) {
-                    $elementIds[] = $element->ID;
-                }
-            }
-        }
-        $elementIds = array_unique(array_filter($elementIds));
-        if (! $elementIds) {
-            return [];
-        }
-        // Проверка наличия кэша свойств
-        $cacheKey = md5(serialize($elementIds)) . '-properties';
-        $cache = CacheService::instance()->getIblockCache(
-            iblockId: $iblockId,
-            cacheKey: $cacheKey,
-            ttl: $builder->getCacheTtl()
-        );
-        if (null !== $cache) {
-            return $cache;
-        }
-        // Собираем массив свойств
-        $data = [];
-        CIBlockElement::GetPropertyValuesArray(
-            result: $data,
-            iblockID: $iblockId,
-            filter: [
-                'ID' => $elementIds
-            ],
-            propertyFilter: [
-                'CODE' => $this->collectPropertyFields($builder)
-            ]
-        );
-        // Запишем в кэш
-        if ($builder->getWithProperties() && $data) {
-            CacheService::instance()->setIblockCache(
-                iblockId: $iblockId,
-                cacheKey: $cacheKey,
-                data: $data,
-                ttl: $builder->getCacheTtl()
-            );
-        }
-
-        return $data;
-    }
-
-    /**
-     * Получение детальной страницы URL
-     * @param Builder $builder
-     * @param int|array $elementId
-     * @return array<string>
-     * @throws SystemException
-     */
-    public function getDetailPageUrl(Builder $builder, int|array $elementId): array
-    {
-        $iblockId = $builder->getModel()->getIblockId();
-        $elementIds = (array)$elementId;
-        // Проверка наличия кэша свойств
-        $cacheKey = md5(serialize($elementIds)) . '-detail-page-url';
-        $cache = CacheService::instance()->getIblockCache(
-            iblockId: $iblockId,
-            cacheKey: $cacheKey,
-            ttl: $builder->getCacheTtl()
-        );
-        if (null !== $cache) {
-            return $cache;
-        }
-        // Получение данных
-        $data = [];
-        $elements = CIBlockElement::getList(
-            arFilter: [
-                '=ID' => $elementIds,
-            ],
-            arSelectFields: [
-                'ID',
-                'DETAIL_PAGE_URL'
-            ]
-        );
-        while ($element = $elements->GetNext()) {
-            $data[(int)$element['ID']] = $element['DETAIL_PAGE_URL'];
-        }
-        // Запишем в кэш
-        if ($builder->getWithProperties() && $data) {
-            CacheService::instance()->setIblockCache(
-                iblockId: $iblockId,
-                cacheKey: $cacheKey,
-                data: $data,
-                ttl: $builder->getCacheTtl()
-            );
-        }
-
         return $data;
     }
 
@@ -235,38 +134,36 @@ final class IModelQuery extends BaseQuery implements QueryableInterface
 
     /**
      * Получить только свойства инфоблока
-     * @param Builder $builder
      * @return array
      */
-    private function collectPropertyFields(Builder $builder): array
+    private function collectPropertyFields(): array
     {
-        $iblockProperties = IModelHelper::getIblockPropertyCodes($builder->getModel()::iblockId());
-        return array_intersect($builder->getSelect(), $iblockProperties) ?: $iblockProperties;
+        $iblockProperties = IModelHelper::getIblockPropertyCodes($this->queryBuilder->getModel()::iblockId());
+        return array_intersect($this->queryBuilder->getSelect(), $iblockProperties) ?: $iblockProperties;
     }
 
     /**
      * Фильтр для Fetch запросов
-     * @param Builder $builder
      * @return array
      */
-    private function collectFetchFilter(Builder $builder): array
+    private function collectFetchFilter(): array
     {
         $cache = [];
-        if ($builder->getCacheTtl() > 0) {
+        if ($this->queryBuilder->getCacheTtl() > 0) {
             $cache = [
                 'cache' => [
-                    'ttl' => $builder->getCacheTtl(),
-                    'cache_joins' => $builder->getCacheJoin()
+                    'ttl' => $this->queryBuilder->getCacheTtl(),
+                    'cache_joins' => $this->queryBuilder->getCacheJoin()
                 ]
             ];
         }
         return array_merge(
             [
-                'filter' => $builder->getFilter(),
-                'select' => $this->collectBaseFields($builder->getSelect()),
-                'order' => $builder->getOrder(),
-                'limit' => $builder->getLimit(),
-                'offset' => $builder->getOffset(),
+                'filter' => $this->queryBuilder->getFilter(),
+                'select' => $this->collectBaseFields($this->queryBuilder->getSelect()),
+                'order' => $this->queryBuilder->getOrder(),
+                'limit' => $this->queryBuilder->getLimit(),
+                'offset' => $this->queryBuilder->getOffset(),
             ],
             $cache
         );
@@ -274,14 +171,13 @@ final class IModelQuery extends BaseQuery implements QueryableInterface
 
     /**
      * В выборке участвуют поля свойств
-     * @param Builder $builder
      * @return bool
      */
-    private function hasPropertyFields(Builder $builder): bool
+    private function hasPropertyFields(): bool
     {
         return (bool)array_intersect(
-            IModelHelper::getIblockPropertyCodes($builder->getModel()::iblockId()),
-            $builder->getSelect()
+            IModelHelper::getIblockPropertyCodes($this->queryBuilder->getModel()::iblockId()),
+            $this->queryBuilder->getSelect()
         );
     }
 }

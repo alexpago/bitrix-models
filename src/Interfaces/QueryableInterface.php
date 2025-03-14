@@ -2,7 +2,6 @@
 
 namespace Pago\Bitrix\Models\Interfaces;
 
-use Bitrix\Main\ORM\Query\Result as QueryResult;
 use Pago\Bitrix\Models\Queries\Builder;
 
 /**
@@ -11,25 +10,20 @@ use Pago\Bitrix\Models\Queries\Builder;
 interface QueryableInterface
 {
     /**
-     * @param string $model
+     * @param string $modelClass
+     * @param Builder $queryBuilder
      */
-    public function __construct(string $model);
+    public function __construct(string $modelClass, Builder $queryBuilder);
 
     /**
-     * @param Builder $builder
+     * Получение элементов
      * @return array
      */
-    public function fetch(Builder $builder): array;
+    public function fetch(): array;
 
     /**
-     * @param array $parameters
-     * @return QueryResult
-     */
-    public function getList(array $parameters = []): QueryResult;
-
-    /**
-     * @param Builder $builder
+     * Количество элементов
      * @return int
      */
-    public function count(Builder $builder): int;
+    public function count(): int;
 }

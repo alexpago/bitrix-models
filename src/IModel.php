@@ -4,25 +4,25 @@ declare(strict_types=1);
 namespace Pago\Bitrix\Models;
 
 use Bitrix\Iblock\ElementTable;
-use Exception;
+use Bitrix\Main\ORM\Objectify\EntityObject;
 use Bitrix\Iblock\Iblock;
 use Bitrix\Iblock\ORM\CommonElementTable;
 use Bitrix\Iblock\ORM\ElementV1;
 use Bitrix\Iblock\ORM\ElementV2;
 use Bitrix\Iblock\ORM\ValueStorage;
 use Bitrix\Main\ArgumentException;
-use Bitrix\Main\Loader;
-use Bitrix\Main\ORM\Objectify\Collection;
-use Bitrix\Main\ORM\Query\Result as QueryResult;
 use Bitrix\Main\SystemException;
+use Bitrix\Main\ORM\Objectify\Collection;
 use Bitrix\Main\Type\DateTime;
 use Pago\Bitrix\Models\Helpers\Helper;
 use Pago\Bitrix\Models\Helpers\IModelHelper;
+use Pago\Bitrix\Models\Interfaces\ModelInterface;
+use Pago\Bitrix\Models\Interfaces\QueryableInterface;
 use Pago\Bitrix\Models\Queries\Builder;
 use Pago\Bitrix\Models\Queries\IModelQuery;
 
 /**
- * Базовые свойства и методы модели инфоблока
+ * Модель инфоблока
  * @property int ID Идентификатор элемента
  * @property string|null TIMESTAMP_X Дата последнего изменения элемента
  * @property int MODIFIED_BY Идентификатор пользователя, который последний раз изменил элемент
@@ -76,7 +76,7 @@ use Pago\Bitrix\Models\Queries\IModelQuery;
  * @method Builder|$this whereCode(string|array $code)
  * @method Builder|$this whereTags(string|array $input)
  */
-class IModel extends BaseModel
+class IModel extends BaseModel implements ModelInterface
 {
     // Переопределение кода инфоблока
     public const IBLOCK_CODE = null;
@@ -142,11 +142,10 @@ class IModel extends BaseModel
     /**
      * Экземпляр объекта инфоблока
      * @return CommonElementTable
-     * @throws Exception
+     * @throws SystemException
      */
     final public static function getEntity(): CommonElementTable
     {
-        Loader::includeModule('iblock');
         $entity = Iblock::wakeUp(static::iblockId())->getEntityDataClass();
         if (null === $entity) {
             throw new SystemException(
@@ -157,27 +156,6 @@ class IModel extends BaseModel
             );
         }
         return new $entity();
-    }
-
-    /**
-     * Фасет GetList
-     * @param array $parameters
-     * @return QueryResult
-     * @see CommonElementTable::getList()
-     */
-    final public static function getList(array $parameters = []): QueryResult
-    {
-        return IModelQuery::instance(static::class)->getList($parameters);
-    }
-
-    /**
-     * Результат запроса
-     * @param Builder $builder
-     * @return array<static>
-     */
-    public static function get(Builder $builder): array
-    {
-        return IModelQuery::instance(static::class)->fetch($builder);
     }
 
     /**
@@ -201,37 +179,37 @@ class IModel extends BaseModel
     }
 
     /**
-     * Количество элементов в БД
-     * @param Builder|null $builder
-     * @return int
-     */
-    final public static function count(?Builder $builder = null): int
-    {
-        if (! $builder) {
-            $builder = new Builder(new static());
-        }
-        return IModelQuery::instance(static::class)->count($builder);
-    }
-
-    /**
      * Установка элемента модели
      * @param IModel $model
-     * @param ElementV2|ElementV1 $element
+     * @param EntityObject $element
      * @param Builder $builder
      * @return $this
      */
     final public static function setElement(
-        IModel              $model,
-        ElementV2|ElementV1 $element,
-        Builder             $builder
-    ): IModel
+        BaseModel    $model,
+        EntityObject $element,
+        Builder      $builder
+    ): static
     {
+        /**
+         * @var ElementV2|ElementV1 $element
+         */
         $model->builder = $builder;
         $model->modelElement = $element;
         $model->originalProperties
             = $model->properties
             = $model->toArray();
         return $model;
+    }
+
+
+    /**
+     * @param Builder $queryBuilder
+     * @return QueryableInterface
+     */
+    static protected function getQuery(Builder $queryBuilder): QueryableInterface
+    {
+        return new IModelQuery(static::class, $queryBuilder);
     }
 
     /**
@@ -271,12 +249,13 @@ class IModel extends BaseModel
             return null;
         }
         if (null === $this->detailPageUrl) {
-            $this->detailPageUrl = IModelQuery::instance(static::class)->getDetailPageUrl($this->builder, $this->ID)[$this->ID];
+            $this->detailPageUrl = IModelHelper::getDetailPageUrl($this->ID, $this->getIblockId())[$this->ID] ?? null;
         }
         return $this->detailPageUrl;
     }
 
     /**
+     * TODO: Перенести в BaseModel
      * Элемент модели
      * @return ElementV2|ElementV1|null
      */
@@ -287,62 +266,62 @@ class IModel extends BaseModel
 
     /**
      * Преобразование ответа в массив
-     * @param bool $relations
      * @return array|null
      */
-    public function toArray(bool $relations = false): ?array
+    public function toArray(): ?array
     {
-        $element = $this->element();
-        if (! $element || !method_exists($element, 'collectValues')) {
+        if (! $this->element()) {
             return null;
         }
+        return array_map(function ($value) {
+            return $this->getToArrayValue($value);
+        }, $this->element()->collectValues() + $this->getProperties());
+    }
 
-        return array_map(function ($value) use ($relations) {
-            return $this->getToArrayValue($value, $relations);
-        }, $element->collectValues() + $this->getProperties());
+    /**
+     * Неизменяемые свойства
+     * @return string[]
+     */
+    public function getUnmodifiable(): array
+    {
+        return [
+            'DETAIL_PAGE_URL'
+        ];
     }
 
     /**
      * Преобразование значения из объектов в массив
-     * @param mixed $collectionValue
-     * @param bool $includeRelations Включить связи
+     * @param mixed $value
      * @return mixed
      */
-    private function getToArrayValue(mixed $collectionValue, bool $includeRelations): mixed
+    private function getToArrayValue(mixed $value): mixed
     {
-        if ($collectionValue instanceof ValueStorage) {
+        // Одно значение из ElementV1/ElementV2
+        if ($value instanceof ValueStorage) {
             try {
-                $value = $collectionValue->collectValues();
+                $collectValues = $value->collectValues();
             } catch (ArgumentException) {
-                $value = null;
+                $collectValues = null;
             }
-
-            if (
-                ! $includeRelations
-                && is_array($value)
-                && array_key_exists('VALUE', $value)
-            ) {
-                $value = $value['VALUE'];
+            if (is_array($collectValues) && array_key_exists('VALUE', $collectValues)) {
+                $collectValues = $collectValues['VALUE'];
             }
-
-            return $value;
+            return $collectValues;
         }
 
-        // Коллекции
-        if ($collectionValue instanceof Collection) {
+        // Несколько значение из ElementV1/ElementV2
+        if ($value instanceof Collection) {
             $result = [];
-            foreach ($collectionValue as $value) {
-                $result[] = $this->getToArrayValue($value, $includeRelations);
+            foreach ($value as $collectValues) {
+                $result[] = $this->getToArrayValue($collectValues);
             }
-
             return $result;
         }
 
         // DateTime
-        if ($collectionValue instanceof DateTime) {
-            return $collectionValue->format('Y-m-d H:i:s');
+        if ($value instanceof DateTime) {
+            return $value->format('Y-m-d H:i:s');
         }
-
-        return $collectionValue;
+        return $value;
     }
 }

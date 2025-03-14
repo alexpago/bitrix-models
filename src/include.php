@@ -38,6 +38,10 @@ if (
     }
 }
 
+// Подключение модулей
+Loader::includeModule('highloadblock');
+Loader::includeModule('iblock');
+
 $eventManager = EventManager::getInstance();
 
 /**

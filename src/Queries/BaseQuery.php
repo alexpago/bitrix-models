@@ -5,7 +5,6 @@ namespace Pago\Bitrix\Models\Queries;
 use Bitrix\Highloadblock\DataManager;
 use Bitrix\Iblock\ORM\CommonElementTable;
 use Bitrix\Main\ORM\Objectify\EntityObject;
-use Bitrix\Main\ORM\Query\Result as QueryResult;
 use Pago\Bitrix\Models\Helpers\DynamicTable;
 use Pago\Bitrix\Models\Helpers\Helper;
 use Pago\Bitrix\Models\HlModel;
@@ -28,66 +27,51 @@ abstract class BaseQuery
     protected string $model;
 
     /**
-     * @param string $model Класс модели
-     * @return static
+     * @var Builder
      */
-    public static function instance(string $model): static
-    {
-        return new static($model);
-    }
+    protected Builder $queryBuilder;
 
     /**
-     * @param string $model
+     * @param string $modelClass
+     * @param Builder $queryBuilder
      */
-    public function __construct(string $model)
+    public function __construct(string $modelClass, Builder $queryBuilder)
     {
-        $this->model = $model;
-        Helper::includeBaseModules();
-    }
-
-    /**
-     * Фасет GetList
-     * @param array $parameters
-     * @return QueryResult
-     */
-    public function getList(array $parameters = []): QueryResult
-    {
-        return $this->getEntity()::getList($parameters);
+        $this->model = $modelClass;
+        $this->queryBuilder = $queryBuilder;
     }
 
     /**
      * Фасет GetCount
-     * @param Builder $builder
      * @return int
      */
-    public function count(Builder $builder): int {
-        return $this->getEntity()::getCount($builder->getFilter());
+    public function count(): int {
+        return $this->getEntity()::getCount($this->queryBuilder->getFilter());
     }
 
     /**
-     * @param Builder $builder
      * @return array
      */
-    public function fetch(Builder $builder): array
+    public function fetch(): array
     {
         $data = [];
         $cache = [];
-        if ($builder->getCacheTtl() > 0) {
+        if ($this->queryBuilder->getCacheTtl() > 0) {
             $cache = [
                 'cache' => [
-                    'ttl' => $builder->getCacheTtl(),
-                    'cache_joins' => $builder->getCacheJoin()
+                    'ttl' => $this->queryBuilder->getCacheTtl(),
+                    'cache_joins' => $this->queryBuilder->getCacheJoin()
                 ]
             ];
         }
         $query = $this->getEntity()::getList(
             array_merge(
                 [
-                    'filter' => $builder->getFilter(),
-                    'select' => $builder->getSelect(),
-                    'order' => $builder->getOrder(),
-                    'limit' => $builder->getLimit(),
-                    'offset' => $builder->getOffset()
+                    'filter' => $this->queryBuilder->getFilter(),
+                    'select' => $this->queryBuilder->getSelect(),
+                    'order' => $this->queryBuilder->getOrder(),
+                    'limit' => $this->queryBuilder->getLimit(),
+                    'offset' => $this->queryBuilder->getOffset()
                 ],
                 $cache
             )
@@ -98,7 +82,7 @@ abstract class BaseQuery
              * @var HlModel|TableModel $model
              */
             $model = new $this->model();
-            $data[] = $model->setElement($model, $element);
+            $data[] = $model->setElement($model, $element, $this->queryBuilder);
         }
 
         return $data;

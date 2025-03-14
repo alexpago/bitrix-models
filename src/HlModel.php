@@ -5,19 +5,19 @@ namespace Pago\Bitrix\Models;
 
 use Bitrix\Highloadblock\DataManager;
 use Bitrix\Highloadblock\HighloadBlockTable;
-use Bitrix\Main\Loader;
 use Bitrix\Main\ORM\Objectify\EntityObject;
-use Bitrix\Main\ORM\Query\Result as QueryResult;
 use Bitrix\Main\SystemException;
-use Exception;
 use Pago\Bitrix\Models\Helpers\HlModelHelper;
+use Pago\Bitrix\Models\Interfaces\HighloadTableInterface;
+use Pago\Bitrix\Models\Interfaces\ModelInterface;
 use Pago\Bitrix\Models\Queries\Builder;
 use Pago\Bitrix\Models\Queries\HlModelQuery;
+use Pago\Bitrix\Models\Interfaces\QueryableInterface;
 
 /**
- * Базовый класс моделей highload блоков
+ * Модель highload блока
  */
-abstract class HlModel extends BaseModel
+abstract class HlModel extends BaseModel implements ModelInterface, HighloadTableInterface
 {
     // Переопределение ID справочника
     public const HL_ID = null;
@@ -33,11 +33,10 @@ abstract class HlModel extends BaseModel
     /**
      * Сущность класса highload блока
      * @return string|null
-     * @throws Exception
+     * @throws SystemException
      */
     final public static function getEntityClass(): ?string
     {
-        Loader::includeModule('highloadblock');
         $entity = HighloadBlockTable::compileEntity(
             HighloadBlockTable::getById(self::hlId())->fetch()
         )->getDataClass();
@@ -70,10 +69,11 @@ abstract class HlModel extends BaseModel
      */
     final public static function hlId(): int
     {
+        // Определение справочника по ID
         if (null !== static::HL_ID) {
             return (int)static::HL_ID;
         }
-        // По символьному коду
+        // Определение справочника по символьному коду
         if (static::HL_CODE) {
             $hlId = HlModelHelper::getHlIdByCode((string)static::HL_CODE);
             if (! $hlId) {
@@ -81,81 +81,27 @@ abstract class HlModel extends BaseModel
             }
             return $hlId;
         }
-
+        // Определение справочника по классу
         $class = explode('\\', static::class);
         $class = end($class);
         $hlId = HlModelHelper::getHlIdByCode($class);
         if (! $hlId) {
             throw new SystemException(sprintf('Highload блок с кодом %s не найден', static::HL_CODE));
         }
-
         return $hlId;
     }
 
     /**
-     * Фасет GetList
-     * @param array $parameters
-     * @return QueryResult
-     * @see DataManager::getList()
+     * @param Builder $queryBuilder
+     * @return QueryableInterface
      */
-    final public static function getList(array $parameters = []): QueryResult
+    static protected function getQuery(Builder $queryBuilder): QueryableInterface
     {
-        return HlModelQuery::instance(static::class)->getList($parameters);
+        return new HlModelQuery(static::class, $queryBuilder);
     }
 
     /**
-     * @param HlModel $model
-     * @param EntityObject $element
-     * @return $this
-     */
-    final public static function setElement(HlModel $model, EntityObject $element): static
-    {
-        $model->modelElement = $element;
-        try {
-            $model->originalProperties = $element->collectValues();
-            $model->fill($model->originalProperties);
-        } catch (SystemException) {
-        }
-        return $model;
-    }
-
-    /**
-     * Результат запроса
-     * @param Builder $builder
-     * @return array<static>
-     */
-    public static function get(Builder $builder): array
-    {
-        return HlModelQuery::instance(static::class)->fetch($builder);
-    }
-
-    /**
-     * Количество элементов в БД
-     * @param Builder|null $builder
-     * @return int
-     */
-    public static function count(?Builder $builder = null): int
-    {
-        if (! $builder) {
-            $builder = new Builder(new static());
-        }
-        return HlModelQuery::instance(static::class)->count($builder);
-    }
-
-    /**
-     * Преобразование ответа в массив
-     * @return array|null
-     */
-    public function toArray(): ?array
-    {
-        try {
-            return $this->modelElement->collectValues();
-        } catch (SystemException) {
-            return null;
-        }
-    }
-
-    /**
+     * TODO: Перенести в BaseModel
      * @return EntityObject|null
      */
     public function element(): EntityObject|null

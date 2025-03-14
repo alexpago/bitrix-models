@@ -18,18 +18,19 @@ final class TableModelQuery extends BaseQuery implements QueryableInterface
     protected DynamicTable $modelEntity;
 
     /**
-     * @param string $model Класс модели
+     * @param string $modelClass
+     * @param Builder $queryBuilder
      */
-    public function __construct(string $model)
+    public function __construct(string $modelClass, Builder $queryBuilder)
     {
         /**
          * @var TableModel $entity
          */
-        $entity = new $model;
+        $entity = new $modelClass;
         $this->modelEntity = new DynamicTable();
         $this->modelEntity::$tableName = $entity::getTableName();
         $this->modelEntity::$map = $entity::getMap();
-        parent::__construct($model);
+        parent::__construct($modelClass, $queryBuilder);
     }
 
     /**
