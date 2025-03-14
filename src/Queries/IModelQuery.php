@@ -129,7 +129,7 @@ final class IModelQuery extends BaseQuery implements QueryableInterface
         if (in_array('*', $select)) {
             return ['*'];
         }
-        return array_intersect($select, IModel::getBaseFields());
+        return array_intersect($select, IModelHelper::getBaseFields());
     }
 
     /**

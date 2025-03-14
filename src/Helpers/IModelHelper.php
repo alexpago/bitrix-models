@@ -27,12 +27,12 @@ final class IModelHelper
 
     /**
      * Символьные кода свойств инфоблока
-     * @param  int  $id
+     * @param  int  $iblockId
      * @return array
      */
-    public static function getIblockPropertyCodes(int $id): array
+    public static function getIblockPropertyCodes(int $iblockId): array
     {
-        return array_column(self::getIblockProperties($id), 'CODE');
+        return array_column(self::getIblockProperties($iblockId), 'CODE');
     }
 
     /**
@@ -42,9 +42,18 @@ final class IModelHelper
      */
     public static function isBaseField(string $field): bool
     {
-        return in_array(strtoupper($field), array_keys(
+        return in_array(strtoupper($field), self::getBaseFields());
+    }
+
+    /**
+     * Получить базовые поля инфоблока
+     * @return array
+     */
+    public static function getBaseFields(): array
+    {
+        return array_keys(
             (new ElementTable())->getEntity()->getFields()
-        ));
+        );
     }
 
     /**
@@ -60,12 +69,12 @@ final class IModelHelper
 
     /**
      * Свойства инфоблока
-     * @param int $id
+     * @param int $iblockId
      * @return array
      */
-    public static function getIblockProperties(int $id): array
+    public static function getIblockProperties(int $iblockId): array
     {
-        if (! array_key_exists($id, self::$properties)) {
+        if (! array_key_exists($iblockId, self::$properties)) {
             $properties = PropertyTable::query()
                 ->setSelect([
                     'ID',
@@ -79,16 +88,15 @@ final class IModelHelper
                     'ID'   => 'DESC'
                 ])
                 ->setFilter([
-                    '=IBLOCK_ID' => $id
+                    '=IBLOCK_ID' => $iblockId
                 ])
                 ->fetchAll();
             if (! is_array($properties)) {
                 $properties = [];
             }
-            self::$properties[$id] = $properties;
+            self::$properties[$iblockId] = $properties;
         }
-
-        return self::$properties[$id];
+        return self::$properties[$iblockId];
     }
 
     /**

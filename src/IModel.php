@@ -3,7 +3,11 @@ declare(strict_types=1);
 
 namespace Pago\Bitrix\Models;
 
-use Bitrix\Iblock\ElementTable;
+use CIBlockElement;
+use Bitrix\Main\Entity\DataManager;
+use Bitrix\Main\DB\Exception;
+use Bitrix\Main\Error;
+use Bitrix\Main\ORM\Data\Result;
 use Bitrix\Main\ORM\Objectify\EntityObject;
 use Bitrix\Iblock\Iblock;
 use Bitrix\Iblock\ORM\CommonElementTable;
@@ -95,17 +99,6 @@ class IModel extends BaseModel implements ModelInterface
      * @var ElementV2|ElementV1|null
      */
     public ElementV2|ElementV1|null $modelElement = null;
-
-    /**
-     * Получить базовые поля инфоблока
-     * @return array
-     */
-    public static function getBaseFields(): array
-    {
-        return array_keys(
-            (new ElementTable())->getEntity()->getFields()
-        );
-    }
 
     /**
      * Вычисление идентификатора инфоблока
@@ -210,6 +203,93 @@ class IModel extends BaseModel implements ModelInterface
     static protected function getQuery(Builder $queryBuilder): QueryableInterface
     {
         return new IModelQuery(static::class, $queryBuilder);
+    }
+
+    /**
+     * Обновление/сохранение элементов
+     * @param bool $callEvents
+     * @return Result
+     */
+    public function save(bool $callEvents = true): Result
+    {
+        $data = $this->getChangedProperties();
+        if (! $data) {
+            return new Result();
+        }
+        // Сценарий: Обновление текущего элемента
+        if ($this->exists()) {
+            return $this->update($this->getChangedProperties(), $callEvents);
+        }
+        /**
+         * Сценарий: Добавление нового элемента
+         * @var CommonElementTable|DataManager $entity
+         */
+        if ($callEvents) {
+            $this->onBeforeAdd();
+        }
+        try {
+            // Шаг 1: Сохраним элемент с базовыми полями инфоблока
+            $baseFields = array_intersect_key($data, array_flip(IModelHelper::getBaseFields()));
+            $result = $this::getEntity()::add($baseFields);
+            // Шаг 2: Сохраним повторно только свойства
+            if ($result->isSuccess()) {
+                $element = $this::query()
+                    ->where($this->getPrimaryKey(), $result->getId())
+                    ->withProperties()
+                    ->first();
+                $element->fill(array_diff($data, $baseFields))->save(false);
+            }
+        } catch (Exception $e) {
+            $result = new Result();
+            $result->setData($data);
+            $result->addError(Error::createFromThrowable($e));
+        }
+        if ($callEvents) {
+            $this->onAfterAdd($result);
+        }
+        return $result;
+    }
+
+    /**
+     * Обновление элемента модели
+     * @param array $data
+     * @param bool $callEvents
+     * @return Result
+     */
+    public function update(array $data, bool $callEvents = true): Result
+    {
+        if (! $this->exists()) {
+            return new Result();
+        }
+        if ($callEvents) {
+            $this->onBeforeUpdate();
+        }
+        // Свойства инфоблока запишем и сохраним отдельно
+        $iblockProperties = [];
+        foreach ($data as $property => $value) {
+            // Базовое поле сохраним обычно
+            if (IModelHelper::isBaseField($property)) {
+                $this->element()->set($property, $value);
+            } elseif (IModelHelper::isProperty($this->getIblockId(), $property)) {
+                // Свойство инфоблока
+                $iblockProperties[$property] = $value;
+            }
+        }
+        // Сохраним свойства инфоблока
+        if ($iblockProperties) {
+            CIBlockElement::SetPropertyValuesEx($this->ID, $this->getIblockId(), $iblockProperties);
+        }
+        try {
+            $update = $this->element()->save();
+        } catch (Exception $e) {
+            $update = new Result();
+            $update->setData($data);
+            $update->addError(Error::createFromThrowable($e));
+        }
+        if ($callEvents) {
+            $this->onAfterUpdate($update);
+        }
+        return $update;
     }
 
     /**

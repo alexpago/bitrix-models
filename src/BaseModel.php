@@ -303,73 +303,19 @@ abstract class BaseModel
         if (! $data) {
             return new Result();
         }
-        $isIblockModel = $this instanceof IModel;
-        $iblockId = $isIblockModel ? $this::iblockId() : 0;
-
-        /**
-         * Обновление текущего элемента
-         */
-        if ($this->element()) {
-            if ($callEvents) {
-                $this->onBeforeUpdate();
-            }
-            // Свойства инфоблока запишем и сохраним отдельно
-            $iblockProperties = [];
-            foreach ($data as $property => $value) {
-                // Инфоблок обработаем иначе
-                if ($isIblockModel) {
-                    // Базовое поле сохраним обычно
-                    if (IModelHelper::isBaseField($property)) {
-                        $this->element()->set($property, $value);
-                    } elseif (IModelHelper::isProperty($iblockId, $property)) {
-                        // Свойство инфоблока
-                        $iblockProperties[$property] = $value;
-                    }
-                    continue;
-                }
-                // Обычное поле справочника или таблицы
-                $this->element()->set($property, $value);
-            }
-            // Сохраним свойства инфоблока
-            if ($iblockProperties) {
-                \CIBlockElement::SetPropertyValuesEx($this->ID, false, $iblockProperties);
-            }
-            try {
-                $update = $this->element()->save();
-            } catch (Exception $e) {
-                $update = new Result();
-                $update->setData($data);
-                $update->addError(Error::createFromThrowable($e));
-            }
-            if ($callEvents) {
-                $this->onAfterUpdate($update);
-            }
-
-            return $update;
+        // Сценарий: Обновление текущего элемента
+        if ($this->exists()) {
+           return $this->update($this->getChangedProperties(), $callEvents);
         }
-
         /**
-         * Добавление нового элемента
+         * Сценарий: Добавление нового элемента
          * @var CommonElementTable|DataManager $entity
          */
         if ($callEvents) {
             $this->onBeforeAdd();
         }
         try {
-            $addData = $data;
-            // Для инфоблока добавим сначала поля инфоблока, потом свойства
-            if ($isIblockModel) {
-                $addData = array_intersect_key($addData, array_flip(IModel::getBaseFields()));
-            }
-            $result = $this::getEntity()::add($addData);
-            // Для инфоблока нужно добавить свойства повторно
-            if ($isIblockModel && $result->isSuccess()) {
-                $element = $this::query()
-                    ->where($this->getPrimaryKey(), $result->getId())
-                    ->withProperties()
-                    ->first();
-                $element->fill(array_diff($data, $addData))->save(false);
-            }
+            $result = $this::getEntity()::add($data);
         } catch (Exception $e) {
             $result = new Result();
             $result->setData($data);
@@ -383,17 +329,6 @@ abstract class BaseModel
     }
 
     /**
-     * Обновление текущего элемента. Старый метод
-     * @param array $data
-     * @return bool
-     * @deprecated
-     */
-    public function elementUpdate(array $data): bool
-    {
-        return $this->update($data)->isSuccess();
-    }
-
-    /**
      * Обновление элемента модели
      * @param array $data
      * @param bool $callEvents
@@ -404,7 +339,25 @@ abstract class BaseModel
         if (! $this->exists()) {
             return new Result();
         }
-        return $this->fill($data)->save($callEvents);
+        if ($callEvents) {
+            $this->onBeforeUpdate();
+        }
+        foreach ($data as $property => $value) {
+            // Обычное поле справочника или таблицы
+            $this->element()->set($property, $value);
+        }
+        try {
+            $update = $this->element()->save();
+        } catch (Exception $e) {
+            $update = new Result();
+            $update->setData($data);
+            $update->addError(Error::createFromThrowable($e));
+        }
+        if ($callEvents) {
+            $this->onAfterUpdate($update);
+        }
+
+        return $update;
     }
 
     /**
@@ -421,6 +374,17 @@ abstract class BaseModel
         $this->{$this->primary} = $primary;
 
         return $this->refresh();
+    }
+
+    /**
+     * Обновление текущего элемента. Старый метод
+     * @param array $data
+     * @return bool
+     * @deprecated
+     */
+    public function elementUpdate(array $data): bool
+    {
+        return $this->update($data)->isSuccess();
     }
 
     /**

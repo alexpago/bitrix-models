@@ -190,7 +190,6 @@ final class IblockTest extends TestCase
     /**
      * Обновление элемента из модели
      * @return void
-     * @throws \Bitrix\Main\SystemException
      */
     public function testUpdateElement()
     {
