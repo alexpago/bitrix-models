@@ -11,8 +11,8 @@ use Bitrix\Main\ORM\Data\Result;
 use Bitrix\Main\ORM\Objectify\EntityObject;
 use Bitrix\Main\ORM\Query\Result as QueryResult;
 use Bitrix\Main\SystemException;
+use Bitrix\Main\Type\Contract\Arrayable;
 use Pago\Bitrix\Models\Helpers\DynamicTable;
-use Pago\Bitrix\Models\Helpers\IModelHelper;
 use Pago\Bitrix\Models\Interfaces\QueryableInterface;
 use Pago\Bitrix\Models\Queries\Builder;
 
@@ -20,7 +20,7 @@ use Pago\Bitrix\Models\Queries\Builder;
  * Базовый класс моделей
  */
 #[\AllowDynamicProperties]
-abstract class BaseModel
+abstract class BaseModel implements Arrayable
 {
     /**
      * Свойства модели
