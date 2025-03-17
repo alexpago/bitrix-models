@@ -4,12 +4,11 @@ namespace Pago\Bitrix\Models\Queries;
 
 use Bitrix\Main\ORM\Data\Result;
 use Pago\Bitrix\Models\BaseModel;
-use Pago\Bitrix\Models\Cache\CacheService;
 use Pago\Bitrix\Models\Helpers\Helper;
 use Pago\Bitrix\Models\Helpers\IModelHelper;
 use Pago\Bitrix\Models\IModel;
-use Pago\Bitrix\Models\Traits\ModelBaseTrait;
 use Pago\Bitrix\Models\Traits\ModelActionTrait;
+use Pago\Bitrix\Models\Traits\ModelBaseTrait;
 use Pago\Bitrix\Models\Traits\ModelRelationTrait;
 use Pago\Bitrix\Models\Traits\ModelWhereTrait;
 
@@ -106,6 +105,27 @@ final class Builder
     public function add(array $data): Result
     {
         return $this->model::add($data);
+    }
+
+    /**
+     * Пагинация запроса
+     * @param int $perPage
+     * @param string $pageName
+     * @param int|null $currentPage
+     * @return Paginator
+     */
+    public function getPaginate(
+        int    $perPage,
+        string $pageName = 'page',
+        ?int   $currentPage = null
+    ): Paginator
+    {
+        return new Paginator(
+            builder: $this,
+            perPage: $perPage,
+            pageName: $pageName,
+            currentPage: $currentPage
+        );
     }
 
     /**

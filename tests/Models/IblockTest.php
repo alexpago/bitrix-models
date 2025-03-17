@@ -4,12 +4,12 @@ namespace Pago\Bitrix\Tests\Models;
 
 use Bitrix\Main\Security\Random;
 use Bitrix\Main\Type\DateTime;
+use CModule;
 use Pago\Bitrix\Models\Helpers\IModelHelper;
 use Pago\Bitrix\Tests\Helpers\IBlockCreatorHelper;
 use Pago\Bitrix\Tests\Helpers\IBlockDeleteHelper;
 use Pago\Bitrix\Tests\Resources\Models\TestIblockModel;
 use PHPUnit\Framework\TestCase;
-use CModule;
 
 /**
  * Тестирование моделей инфоблока
@@ -271,6 +271,33 @@ final class IblockTest extends TestCase
         $this->assertNotNull($element->LABELS);
         $this->assertNotNull($element->ID);
         $this->assertNull($element->PRICE);
+    }
+
+    /**
+     * Тестирование пагинации
+     * @return void
+     */
+    public function testGetPaginatedElements()
+    {
+        $elements = $this->createRandomElements(50);
+        // Построитель запроса
+        $builder = TestIblockModel::query()->whereId($elements)->order('ID');
+        // Получим пагинацию
+        $currentPage = rand(1, 5);
+        $perPage = rand(5, 20);
+        $paginator = $builder->getPaginate($perPage, 'page', $currentPage);
+        // Ожидаемые данные
+        $expectedTotalElements = $builder->count();
+        $expectedLastPage = (int)ceil($expectedTotalElements / $perPage);
+        $expectedStructure = [
+            'total' => $expectedTotalElements,
+            'perPage' => $perPage,
+            'currentPage' => $currentPage,
+            'lastPage' => $expectedLastPage,
+            'hasMorePages' => $expectedLastPage > $currentPage,
+            'data' => $builder->getArray($perPage, ($currentPage - 1) * $perPage),
+        ];
+        $this->assertEquals($expectedStructure, $paginator->toArray());
     }
 
     /**
