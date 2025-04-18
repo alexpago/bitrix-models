@@ -106,13 +106,13 @@ final class IModelQuery extends BaseQuery implements QueryableInterface
             // Детальная страница элемента
             if (!empty($detailPageUrls[$model->ID])) {
                 $model->detailPageUrl = $detailPageUrls[$model->ID];
-                $model->fill([
+                $model->setOriginalProperties([
                     'DETAIL_PAGE_URL' => $detailPageUrls[$model->ID]
                 ]);
             }
             // Свойства
             if (is_array($properties[$model->ID] ?? null)) {
-                $model->fill($properties[$model->ID]);
+                $model->setOriginalProperties($properties[$model->ID]);
             }
             $data[] = $model;
         }

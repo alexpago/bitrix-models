@@ -185,6 +185,19 @@ abstract class BaseModel implements Arrayable
     }
 
     /**
+     * @param array $data
+     * @return $this
+     */
+    public function setOriginalProperties(array $data): static
+    {
+        foreach ($data as $parameter => $value) {
+            $this->properties[$parameter] = $value;
+            $this->originalProperties[$parameter] = $value;
+        }
+        return $this;
+    }
+
+    /**
      * Актуализировать элемент из БД
      * @return $this
      */
@@ -458,7 +471,7 @@ abstract class BaseModel implements Arrayable
     {
         $properties = [];
         foreach ($this->properties as $property => $value) {
-            if (!isset($this->originalProperties[$property])) {
+            if (! isset($this->originalProperties[$property])) {
                 $properties[$property] = $value;
                 continue;
             }
