@@ -9,9 +9,9 @@ use Pago\Bitrix\Models\Helpers\HlModelHelper;
 
 if (empty($_SERVER['DOCUMENT_ROOT']) && php_sapi_name() === 'cli') {
     // Для vendor
-    if (str_contains(getenv('PWD'), 'vendor')) {
-        $_SERVER['DOCUMENT_ROOT'] = explode('vendor', getenv('PWD'))[0];
-    } elseif (str_contains(getenv('PWD'), 'bitrix-models')) {
+    if (str_contains(__DIR__, 'vendor')) {
+        $_SERVER['DOCUMENT_ROOT'] = explode('vendor', __DIR__)[0];
+    } elseif (str_contains(__DIR__, 'bitrix-models')) {
         // Возможно он помещен в коревую директорию bitrix-models
         $_SERVER['DOCUMENT_ROOT'] = __DIR__ . '/../../';
     }

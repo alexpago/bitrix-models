@@ -7,7 +7,7 @@ if (php_sapi_name() != 'cli') {
 }
 
 if (empty($_SERVER['DOCUMENT_ROOT'])) {
-    $_SERVER['DOCUMENT_ROOT'] = explode('/vendor/', getenv('PWD'))[0];
+    $_SERVER['DOCUMENT_ROOT'] = explode('/vendor/', __DIR__)[0];
 }
 
 const NO_KEEP_STATISTIC = true;
