@@ -65,6 +65,14 @@ abstract class BaseQuery
                 ]
             ];
         }
+        // Уничтожим существующий экземляр класса от старой таблицы
+        if (
+            $this->getEntity() instanceof DynamicTable
+            && Entity::isExists($this->getEntity()::getEntity()->getDataClass())
+            && ($this->getEntity()::getTableName() !== $this->getEntity()::getEntity()->getDBTableName())
+        ) {
+            Entity::destroy($this->getEntity()::getEntity());
+        }
         $query = $this->getEntity()::getList(
             array_merge(
                 [
@@ -84,10 +92,6 @@ abstract class BaseQuery
              */
             $model = new $this->model();
             $data[] = $model->setElement($model, $element, $this->queryBuilder);
-        }
-        // Уничтожим экземляр класса для следующей таблицы
-        if ($this->getEntity() instanceof DynamicTable) {
-            Entity::destroy($this->getEntity()::getEntity());
         }
 
         return $data;
