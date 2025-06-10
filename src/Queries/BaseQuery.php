@@ -5,6 +5,7 @@ namespace Pago\Bitrix\Models\Queries;
 use Bitrix\Highloadblock\DataManager;
 use Bitrix\Iblock\ORM\CommonElementTable;
 use Bitrix\Main\ORM\Objectify\EntityObject;
+use Bitrix\Main\ORM\Entity;
 use Pago\Bitrix\Models\Helpers\DynamicTable;
 use Pago\Bitrix\Models\Helpers\Helper;
 use Pago\Bitrix\Models\HlModel;
@@ -83,6 +84,10 @@ abstract class BaseQuery
              */
             $model = new $this->model();
             $data[] = $model->setElement($model, $element, $this->queryBuilder);
+        }
+        // Уничтожим экземляр класса для следующей таблицы
+        if ($this->getEntity() instanceof DynamicTable) {
+            Entity::destroy($this->getEntity()::getEntity());
         }
 
         return $data;
