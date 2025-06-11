@@ -5,6 +5,7 @@ namespace Pago\Bitrix\Tests\Models;
 use Bitrix\Main\Security\Random;
 use Bitrix\Main\Type\DateTime;
 use Pago\Bitrix\Tests\Resources\Models\TestTable;
+use Pago\Bitrix\Tests\Resources\Models\TestTable2;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -15,7 +16,7 @@ final class TableTest extends TestCase
     // Название таблицы тестового справочника
     public const TABLE_NAME = 'test_table';
 
-    // Запрос на создание таблицы
+    // Запрос на создание таблицы test_table
     private const SQL_CREATE = 'CREATE TABLE test_table (
   ID int unsigned NOT NULL AUTO_INCREMENT,
   NAME varchar(255),
@@ -23,10 +24,20 @@ final class TableTest extends TestCase
   PRICE double DEFAULT NULL,
   ACTIVE_FROM datetime DEFAULT NULL,
   PRIMARY KEY (ID)
-) ENGINE=InnoDB';
+) ENGINE=InnoDB;';
 
-    // Запрос на удаление таблицы
+    // Запрос на создание таблицы test_table_2
+    private const SQL_CREATE_2 = 'CREATE TABLE test_table_2 (
+  ID int unsigned NOT NULL AUTO_INCREMENT,
+  FIELD varchar(255),
+  PRIMARY KEY (ID)
+) ENGINE=InnoDB;';
+
+    // Запрос на удаление таблицы test_table
     private const SQL_DELETE = 'drop table if exists test_table;';
+
+    // Запрос на удаление таблицы test_table_2
+    private const SQL_DELETE_2 = 'drop table if exists test_table_2;';
 
     /**
      * @return void
@@ -36,7 +47,9 @@ final class TableTest extends TestCase
     {
         global $DB;
         $DB->Query(self::SQL_DELETE);
+        $DB->Query(self::SQL_DELETE_2);
         $DB->Query(self::SQL_CREATE);
+        $DB->Query(self::SQL_CREATE_2);
     }
 
     /**
@@ -47,6 +60,7 @@ final class TableTest extends TestCase
     {
         global $DB;
         $DB->Query(self::SQL_DELETE);
+        $DB->Query(self::SQL_DELETE_2);
     }
 
     /**
@@ -55,11 +69,11 @@ final class TableTest extends TestCase
      */
     public function testQueryAddElement()
     {
+        // Добавим элементы в TestTable
         $data = [
             'NAME' => Random::getString(10),
             'PRICE' => $this->getRandomPrice(),
         ];
-
         $add = TestTable::query()->add($data);
         $this->assertTrue($add->isSuccess());
         $element = TestTable::query()
@@ -72,6 +86,11 @@ final class TableTest extends TestCase
             $this->assertEquals($data['NAME'], $element->NAME);
             $this->assertEquals($data['PRICE'], $element->PRICE);
         }
+        // Добавим элементы в TestTable2
+        $add = TestTable2::query()->add([
+            'FIELD' => Random::getString(10)
+        ]);
+        $this->assertTrue($add->isSuccess());
     }
 
     /**

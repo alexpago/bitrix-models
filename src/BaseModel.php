@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace Pago\Bitrix\Models;
 
-use Bitrix\Highloadblock\DataManager;
+use Bitrix\Main\ORM\Data\DataManager;
 use Bitrix\Iblock\ORM\CommonElementTable;
 use Bitrix\Main\DB\Exception;
 use Bitrix\Main\Error;
@@ -12,7 +12,6 @@ use Bitrix\Main\ORM\Objectify\EntityObject;
 use Bitrix\Main\ORM\Query\Result as QueryResult;
 use Bitrix\Main\SystemException;
 use Bitrix\Main\Type\Contract\Arrayable;
-use Pago\Bitrix\Models\Helpers\DynamicTable;
 use Pago\Bitrix\Models\Interfaces\QueryableInterface;
 use Pago\Bitrix\Models\Queries\Builder;
 
@@ -47,9 +46,9 @@ abstract class BaseModel implements Arrayable
 
     /**
      * Получение экземпляра класса
-     * @return CommonElementTable|DataManager|DynamicTable|null
+     * @return CommonElementTable|DataManager|null
      */
-    abstract static function getEntity(): CommonElementTable|DataManager|DynamicTable|null;
+    abstract static function getEntity(): CommonElementTable|DataManager|null;
 
     /**
      * @return mixed

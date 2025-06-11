@@ -2,12 +2,9 @@
 
 namespace Pago\Bitrix\Models\Queries;
 
-use Bitrix\Highloadblock\DataManager;
+use Bitrix\Main\ORM\Data\DataManager;
 use Bitrix\Iblock\ORM\CommonElementTable;
 use Bitrix\Main\ORM\Objectify\EntityObject;
-use Bitrix\Main\ORM\Entity;
-use Pago\Bitrix\Models\Helpers\DynamicTable;
-use Pago\Bitrix\Models\Helpers\Helper;
 use Pago\Bitrix\Models\HlModel;
 use Pago\Bitrix\Models\TableModel;
 
@@ -17,7 +14,7 @@ use Pago\Bitrix\Models\TableModel;
 abstract class BaseQuery
 {
     /**
-     * @return DataManager|CommonElementTable|DynamicTable
+     * @return DataManager|CommonElementTable
      */
     abstract public function getEntity();
 
@@ -64,14 +61,6 @@ abstract class BaseQuery
                     'cache_joins' => $this->queryBuilder->getCacheJoin()
                 ]
             ];
-        }
-        // Уничтожим существующий экземляр класса от старой таблицы
-        if (
-            $this->getEntity() instanceof DynamicTable
-            && Entity::isExists($this->getEntity()::getEntity()->getDataClass())
-            && ($this->getEntity()::getTableName() !== $this->getEntity()::getEntity()->getDBTableName())
-        ) {
-            Entity::destroy($this->getEntity()::getEntity());
         }
         $query = $this->getEntity()::getList(
             array_merge(

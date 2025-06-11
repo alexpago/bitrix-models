@@ -3,8 +3,10 @@ declare(strict_types=1);
 
 namespace Pago\Bitrix\Models;
 
+use Bitrix\Main\ArgumentException;
+use Bitrix\Main\ORM\Data\DataManager;
 use Bitrix\Main\ORM\Objectify\EntityObject;
-use Pago\Bitrix\Models\Helpers\DynamicTable;
+use Bitrix\Main\SystemException;
 use Pago\Bitrix\Models\Helpers\Helper;
 use Pago\Bitrix\Models\Helpers\TableModelHelper;
 use Pago\Bitrix\Models\Interfaces\HighloadTableInterface;
@@ -58,15 +60,13 @@ abstract class TableModel extends BaseModel implements ModelInterface, HighloadT
 
     /**
      * Экземпляр объекта таблицы
-     * @return DynamicTable|null
+     * @return DataManager|null
+     * @throws ArgumentException
+     * @throws SystemException
      */
-    final public static function getEntity(): ?DynamicTable
+    final public static function getEntity(): ?DataManager
     {
-        $entity = new DynamicTable();
-        $entity::$tableName = static::getTableName();
-        $entity::$map = static::getMap();
-
-        return $entity;
+        return TableModelQuery::getModelEntity(static::class);
     }
 
     /**
