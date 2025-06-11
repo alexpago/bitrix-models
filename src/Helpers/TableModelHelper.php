@@ -74,7 +74,7 @@ final class TableModelHelper
                 'decimal' => new DecimalField($column['name']),
                 'boolean', 'bool' => new BooleanField($column['name']),
                 'date' => new DateField($column['name']),
-                'datetime' => new DatetimeField($column['name']),
+                'datetime', 'timestamp' => new DatetimeField($column['name']),
                 'varchar', 'char' => new StringField($column['name']),
                 default => new TextField($column['name'])
             };
