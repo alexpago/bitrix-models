@@ -130,7 +130,7 @@ final class TableModelHelper
     {
         $columns = [];
 
-        foreach (explode(PHP_EOL, $createTableSql) as $line) {
+        foreach (explode("\n", $createTableSql) as $line) {
             $line = trim($line);
 
             // Ищем строки, которые определяют колонки
