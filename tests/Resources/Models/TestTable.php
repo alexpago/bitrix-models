@@ -12,6 +12,7 @@ use Pago\Bitrix\Models\TableModel;
  * @property string NAME // NAME
  * @property string XML_ID // XML_ID
  * @property string PRICE // PRICE
+ * @property array LABELS // LABELS
  * @property DateTime ACTIVE_FROM // ACTIVE_FROM
  * @method static Builder|$this query()
  * @method Builder|$this get()

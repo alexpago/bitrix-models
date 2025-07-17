@@ -4,6 +4,7 @@ namespace Pago\Bitrix\Tests\Models;
 
 use Bitrix\Main\Security\Random;
 use Bitrix\Main\Type\DateTime;
+use Pago\Bitrix\Tests\Helpers\Traits\RandomHelperTrait;
 use Pago\Bitrix\Tests\Resources\Models\TestTable;
 use Pago\Bitrix\Tests\Resources\Models\TestTable2;
 use PHPUnit\Framework\TestCase;
@@ -13,6 +14,8 @@ use PHPUnit\Framework\TestCase;
  */
 final class TableTest extends TestCase
 {
+    use RandomHelperTrait;
+
     // Название таблицы тестового справочника
     public const TABLE_NAME = 'test_table';
 
@@ -22,6 +25,7 @@ final class TableTest extends TestCase
   NAME varchar(255),
   XML_ID varchar(255),
   PRICE double DEFAULT NULL,
+  LABELS json DEFAULT NULL,
   ACTIVE_FROM datetime DEFAULT NULL,
   PRIMARY KEY (ID)
 ) ENGINE=InnoDB;';
@@ -176,7 +180,6 @@ final class TableTest extends TestCase
     /**
      * Обновление элемента из модели
      * @return void
-     * @throws \Bitrix\Main\SystemException
      */
     public function testUpdateElement()
     {
@@ -223,23 +226,63 @@ final class TableTest extends TestCase
     }
 
     /**
+     * Получение элемента
+     * @return void
+     */
+    public function testGetElement()
+    {
+        $labels = $this->getRandomLabels(5);
+        $price = $this->getRandomPrice();
+        $elementId = $this->createRandomElements(
+            count: 1,
+            price: $price,
+            labels: $labels
+        )[0];
+        // Поиск по идентификатору
+        $element = TestTable::query()
+            ->whereId($elementId)
+            ->first();
+        $this->assertIsObject($element);
+        $this->assertNotNull($element->PRICE);
+        $this->assertNotNull($element->LABELS);
+
+        // Отрицательный поиск. Ищем по whereNotIn. Не должны найти элемент
+//        $element = TestTable::query()
+//            ->whereNotIn('LABELS', [$labels[0]])
+//            ->orderDesc('ID')
+//            ->first();
+//        $this->assertNotEquals($element?->ID, $elementId);
+
+        // Положительный поиск. Ищем по whereIn. Должны найти элемент
+//        $element = TestTable::query()
+//            ->whereIn('LABELS', [$labels[0], $labels[3]])
+//            ->orderDesc('ID')
+//            ->first();
+//        $this->assertEquals($element?->ID, $elementId);
+    }
+
+    /**
      * Создать случайные элементы
      * @param int $count
      * @param int|null $price
+     * @param array|null $labels
      * @return int[]
      */
     private function createRandomElements(
-        int  $count = 1,
-        ?int $price = null,
+        int    $count = 1,
+        ?int   $price = null,
+        ?array $labels = null,
     ): array
     {
         $elements = [];
         for ($i = 0; $i < $count; $i++) {
             // Случайные данные
             $price = $price ?: $this->getRandomPrice();
+            $labels = $labels ?: $this->getRandomLabels();
             // Создадим элемент
             $element = new TestTable();
             $element->NAME = Random::getString(10);
+            $element->LABELS = $labels;
             $element->PRICE = $price;
             $save = $element->save();
             if (! $save->isSuccess()) {
@@ -248,13 +291,5 @@ final class TableTest extends TestCase
             $elements[] = $save->getId();
         }
         return $elements;
-    }
-
-    /**
-     * @return int
-     */
-    private function getRandomPrice(): int
-    {
-        return rand(0, 100_00_00);
     }
 }

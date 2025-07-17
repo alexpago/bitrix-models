@@ -4,18 +4,21 @@ namespace Pago\Bitrix\Tests\Models;
 
 use Bitrix\Main\Security\Random;
 use Bitrix\Main\Type\DateTime;
-use CModule;
 use Pago\Bitrix\Models\Helpers\IModelHelper;
 use Pago\Bitrix\Tests\Helpers\IBlockCreatorHelper;
 use Pago\Bitrix\Tests\Helpers\IBlockDeleteHelper;
+use Pago\Bitrix\Tests\Helpers\Traits\RandomHelperTrait;
 use Pago\Bitrix\Tests\Resources\Models\TestIblockModel;
 use PHPUnit\Framework\TestCase;
+use CModule;
 
 /**
  * Тестирование моделей инфоблока
  */
 final class IblockTest extends TestCase
 {
+    use RandomHelperTrait;
+
     // Код тестового инфоблока
     public const IBLOCK_CODE = 'test_iblock_model';
 
@@ -171,7 +174,7 @@ final class IblockTest extends TestCase
     public function testAddElement()
     {
         $price = 1000;
-        $labels = ['test label', 'test label 2', 'test label 3'];
+        $labels = $this->getRandomLabels();
         // Создадим случайный элемент
         $elementId = $this->createRandomElements(
             price: $price,
@@ -246,7 +249,14 @@ final class IblockTest extends TestCase
      */
     public function testGetElement()
     {
-        $elementId = $this->createRandomElements()[0];
+        $labels = $this->getRandomLabels(5);
+        $price = $this->getRandomPrice();
+        $elementId = $this->createRandomElements(
+            count: 1,
+            price: $price,
+            labels: $labels
+        )[0];
+        // Поиск по идентификатору без свойств
         $element = TestIblockModel::query()
             ->whereId($elementId)
             ->first();
@@ -254,6 +264,7 @@ final class IblockTest extends TestCase
         $this->assertNull($element->PRICE);
         $this->assertNull($element->LABELS);
 
+        // Получим элемент по идентификатору со свойством PRICE, но без LABELS
         $element = TestIblockModel::query()
             ->select('ID', 'PRICE')
             ->whereId($elementId)
@@ -262,6 +273,7 @@ final class IblockTest extends TestCase
         $this->assertNotNull($element->ID);
         $this->assertNull($element->LABELS);
 
+        // Получим элемент с детальной страницей, свойствами и выборкой select
         $element = TestIblockModel::query()
             ->withProperties()
             ->withDetailPageUrl()
@@ -271,6 +283,20 @@ final class IblockTest extends TestCase
         $this->assertNotNull($element->LABELS);
         $this->assertNotNull($element->ID);
         $this->assertNull($element->PRICE);
+
+        // Отрицательный поиск. Ищем по whereNotIn. Не должны найти элемент
+//        $element = TestIblockModel::query()
+//            ->whereNotIn('LABELS', [$labels[0]])
+//            ->orderDesc('ID')
+//            ->first();
+//        $this->assertNotEquals($element?->ID, $elementId);
+
+        // Положительный поиск. Ищем по whereIn. Должны найти элемент
+        $element = TestIblockModel::query()
+            ->whereIn('LABELS', [$labels[0], $labels[3]])
+            ->orderDesc('ID')
+            ->first();
+        $this->assertEquals($element?->ID, $elementId);
     }
 
     /**
@@ -330,21 +356,5 @@ final class IblockTest extends TestCase
             $elements[] = $save->getId();
         }
         return $elements;
-    }
-
-    /**
-     * @return int
-     */
-    private function getRandomPrice(): int
-    {
-        return rand(0, 100_00_00);
-    }
-
-    /**
-     * @return array
-     */
-    private function getRandomLabels(): array
-    {
-        return [Random::getString(10), Random::getString(10), Random::getString(10)];
     }
 }

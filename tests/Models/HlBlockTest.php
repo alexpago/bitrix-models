@@ -7,6 +7,7 @@ use Bitrix\Main\Type\DateTime;
 use Pago\Bitrix\Models\Helpers\HlModelHelper;
 use Pago\Bitrix\Tests\Helpers\HlBlockCreatorHelper;
 use Pago\Bitrix\Tests\Helpers\HlBlockDeleteHelper;
+use Pago\Bitrix\Tests\Helpers\Traits\RandomHelperTrait;
 use Pago\Bitrix\Tests\Resources\Models\TestHighloadBlock;
 use PHPUnit\Framework\TestCase;
 use CModule;
@@ -16,6 +17,8 @@ use CModule;
  */
 final class HlBlockTest extends TestCase
 {
+    use RandomHelperTrait;
+
     // Название - код тестового справочника
     public const HLBLOCK_NAME = 'TestHighloadBlock';
 
@@ -184,7 +187,7 @@ final class HlBlockTest extends TestCase
     public function testAddElement()
     {
         $price = 1000;
-        $labels = ['test label', 'test label 2', 'test label 3'];
+        $labels = $this->getRandomLabels();
         // Создадим случайный элемент
         $elementId = $this->createRandomElements(
             price: $price,
@@ -255,6 +258,42 @@ final class HlBlockTest extends TestCase
     }
 
     /**
+     * Получение элемента
+     * @return void
+     */
+    public function testGetElement()
+    {
+        $labels = $this->getRandomLabels(5);
+        $price = $this->getRandomPrice();
+        $elementId = $this->createRandomElements(
+            count: 1,
+            price: $price,
+            labels: $labels
+        )[0];
+        // Поиск по идентификатору
+        $element = TestHighloadBlock::query()
+            ->whereId($elementId)
+            ->first();
+        $this->assertIsObject($element);
+        $this->assertNotNull($element->UF_PRICE);
+        $this->assertNotNull($element->UF_LABELS);
+
+        // Отрицательный поиск. Ищем по whereNotIn. Не должны найти элемент
+//        $element = TestHighloadBlock::query()
+//            ->whereNotIn('UF_LABELS', [$labels[0]])
+//            ->orderDesc('ID')
+//            ->first();
+//        $this->assertNotEquals($element?->ID, $elementId);
+
+        // Положительный поиск. Ищем по whereIn. Должны найти элемент
+        $element = TestHighloadBlock::query()
+            ->whereIn('UF_LABELS', [$labels[0], $labels[3]])
+            ->orderDesc('ID')
+            ->first();
+        $this->assertEquals($element?->ID, $elementId);
+    }
+
+    /**
      * Создать случайные элементы
      * @param int $count
      * @param int|null $price
@@ -284,21 +323,5 @@ final class HlBlockTest extends TestCase
             $elements[] = $save->getId();
         }
         return $elements;
-    }
-
-    /**
-     * @return int
-     */
-    private function getRandomPrice(): int
-    {
-        return rand(0, 100_00_00);
-    }
-
-    /**
-     * @return array
-     */
-    private function getRandomLabels(): array
-    {
-        return [Random::getString(10), Random::getString(10), Random::getString(10)];
     }
 }

@@ -213,17 +213,9 @@ final class Builder
         // Построитель поиска
         if (preg_match('/where([a-z])/i', $name)) {
             $field = strtoupper(Helper::camelToSnakeCase(str_replace('where', '', $name)));
-            // Если это свойство инфоблока, то добавим VALUE для источника поиска
-            if ($this->isIblockModel() && ! IModelHelper::isBaseField($field)) {
-                $field .= '.VALUE';
-            }
             $operator = $arguments[1] ?? '=';
 
-            return $this->where(
-                $field,
-                $operator,
-                $arguments[0]
-            );
+            return $this->where($field, $operator, $arguments[0]);
         }
 
         return null;
@@ -243,26 +235,6 @@ final class Builder
         }
 
         return $this->setOffset($offset)->setLimit($itemsPerPage);
-    }
-
-    /**
-     * Фильтрация OR с учетом инфоблока
-     * @param string $property
-     * @param $operator
-     * @param $data
-     * @return $this
-     */
-    public function orWhere(string $property, $operator, $data = null): self
-    {
-        if (
-            $this->isIblockModel()
-            && ! IModelHelper::isBaseField($property)
-            && ! str_contains($property, '.')
-        ) {
-            $property .= '.VALUE';
-        }
-
-        return $this->traitOrWhere($property, $operator, $data);
     }
 
     /**

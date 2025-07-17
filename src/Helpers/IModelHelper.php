@@ -6,6 +6,9 @@ namespace Pago\Bitrix\Models\Helpers;
 use Bitrix\Iblock\ElementTable;
 use Bitrix\Iblock\IblockTable;
 use Bitrix\Iblock\PropertyTable;
+use Bitrix\Main\ArgumentException;
+use Bitrix\Main\ObjectPropertyException;
+use Bitrix\Main\SystemException;
 use Pago\Bitrix\Models\Cache\CacheService;
 use Pago\Bitrix\Models\IModel;
 use CIBlockElement;
@@ -65,6 +68,22 @@ final class IModelHelper
     public static function isProperty(int $iblockId, string $property): bool
     {
         return in_array($property, self::getIblockPropertyCodes($iblockId));
+    }
+
+    /**
+     * Свойство инфоблока
+     * @param int $iblockId
+     * @param string $code
+     * @return array|null
+     */
+    public static function getIblockProperty(int $iblockId, string $code): ?array
+    {
+        $properties = self::getIblockProperties($iblockId);
+        $searchCodeIndex = array_search($code, array_column($properties, 'CODE'));
+        if (false === $searchCodeIndex) {
+            return null;
+        }
+        return $properties[$searchCodeIndex];
     }
 
     /**
