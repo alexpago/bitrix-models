@@ -6,11 +6,14 @@ namespace Pago\Bitrix\Models\Helpers;
 use Bitrix\Main\Application;
 use Bitrix\Main\Entity\FloatField;
 use Bitrix\Main\ORM\Data\DataManager;
+use Bitrix\Main\ORM\Fields\ArrayField;
 use Bitrix\Main\ORM\Fields\BooleanField;
 use Bitrix\Main\ORM\Fields\DateField;
 use Bitrix\Main\ORM\Fields\DatetimeField;
 use Bitrix\Main\ORM\Fields\DecimalField;
+use Bitrix\Main\ORM\Fields\EnumField;
 use Bitrix\Main\ORM\Fields\IntegerField;
+use Bitrix\Main\ORM\Fields\ObjectField;
 use Bitrix\Main\ORM\Fields\StringField;
 use Bitrix\Main\ORM\Fields\TextField;
 use Bitrix\Main\SystemException;
@@ -57,25 +60,31 @@ final class TableModelHelper
     }
 
     /**
-     * Получение свойств getMap для @param string $tableName
+     * Получение свойств getMap для
+     * @param string $tableName
+     * @param array $casts Предопределение типов полей
      * @return array
-     * @see DataManager
+     * @throws SystemException @see DataManager
      */
-    public function getMap(string $tableName): array
+    public function getMap(string $tableName, array $casts = []): array
     {
         if (array_key_exists($tableName, $this->maps)) {
             return $this->maps;
         }
         $map = [];
         foreach ($this->getTableColumns($tableName) as $column) {
-            $mapField = match ($column['type']) {
-                'int' => new IntegerField($column['name']),
-                'float' => new FloatField($column['name']),
+            $type = strtolower($casts[$column['name']] ?? $column['type']);
+            $mapField = match ($type) {
+                'int', 'integer', 'tinyint', 'smallint', 'mediumint', 'bigint' => new IntegerField($column['name']),
+                'float', 'double', 'real' => new FloatField($column['name']),
                 'decimal' => new DecimalField($column['name']),
                 'boolean', 'bool' => new BooleanField($column['name']),
                 'date' => new DateField($column['name']),
                 'datetime', 'timestamp' => new DatetimeField($column['name']),
                 'varchar', 'char' => new StringField($column['name']),
+                'json' => new ArrayField($column['name']),
+                'enum' => new EnumField($column['name']),
+                'object' => new ObjectField($column['name']),
                 default => new TextField($column['name'])
             };
             if ($column['auto_increment']) {

@@ -34,6 +34,13 @@ abstract class TableModel extends BaseModel implements ModelInterface, HighloadT
     public EntityObject|null $modelElement = null;
 
     /**
+     * Предопределение типов полей.
+     * Доступно: integer, float, boolean, decimal, string, date, datetime, array, enum, object
+     * @var array
+     */
+    public static array $casts = [];
+
+    /**
      * Название таблицы
      * @return string
      */
@@ -55,7 +62,7 @@ abstract class TableModel extends BaseModel implements ModelInterface, HighloadT
     public static function getMap(): array
     {
         $helper = new TableModelHelper();
-        return $helper->getMap(static::getTableName());
+        return $helper->getMap(static::getTableName(), static::$casts);
     }
 
     /**
