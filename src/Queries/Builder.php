@@ -2,15 +2,17 @@
 
 namespace Pago\Bitrix\Models\Queries;
 
+use Bitrix\Main\ObjectNotFoundException;
 use Bitrix\Main\ORM\Data\Result;
+use Bitrix\Main\SystemException;
 use Pago\Bitrix\Models\BaseModel;
 use Pago\Bitrix\Models\Helpers\Helper;
-use Pago\Bitrix\Models\Helpers\IModelHelper;
 use Pago\Bitrix\Models\IModel;
 use Pago\Bitrix\Models\Traits\ModelActionTrait;
 use Pago\Bitrix\Models\Traits\ModelBaseTrait;
 use Pago\Bitrix\Models\Traits\ModelRelationTrait;
 use Pago\Bitrix\Models\Traits\ModelWhereTrait;
+use Throwable;
 
 /**
  * Генерация запросов к моделям
@@ -169,6 +171,89 @@ final class Builder
     public function first(): ?BaseModel
     {
         return $this->get(1)[0] ?? null;
+    }
+
+    /**
+     * Получить первый элемент или вызвать исключение
+     * @param string $exception
+     * @return T
+     * @throws SystemException
+     * @throws Throwable
+     */
+    public function firstOrFail(
+        string $exception = ObjectNotFoundException::class
+    ): ?BaseModel
+    {
+        if (! is_a($exception, Throwable::class, true)) {
+            throw new SystemException('Exception is not throwable');
+        }
+        $element = $this->first();
+        if (null === $element) {
+            throw new $exception('Object not found');
+        }
+        return $element;
+    }
+
+    /**
+     * Получить первый элемент или осуществить редирект
+     * @param string $url
+     * @param string $status
+     * @return T
+     */
+    public function firstOrRedirect(
+        string $url = '/404.php',
+        string $status = '404 Not found'
+    ): ?BaseModel
+    {
+        $element = $this->first();
+        if (null === $element) {
+            LocalRedirect(url: $url, status: $status);
+        }
+        return $element;
+    }
+
+    /**
+     * Получить первый элемент или осуществить редирект
+     * @param mixed $find
+     * @param string $url
+     * @param string $status
+     * @param array $select
+     * @return T
+     */
+    public function findOrRedirect(
+        mixed  $find,
+        string $url = '/404.php',
+        string $status = '404 Not found',
+        array  $select = []
+    ): ?BaseModel
+    {
+        $this->where($this->getModel()->getPrimaryKey(), $find);
+        if ($select) {
+            $this->setSelect($select);
+        }
+        return $this->firstOrRedirect($url, $status);
+    }
+
+    /**
+     * Получить первый элемент или вызвать исключение
+     * @param mixed $find
+     * @param string $exception
+     * @param string|array $select
+     * @return T
+     * @throws SystemException
+     * @throws Throwable
+     */
+    public function findOrFail(
+        mixed        $find,
+        string       $exception = ObjectNotFoundException::class,
+        string|array $select = []
+    ): ?BaseModel
+    {
+        $this->where($this->getModel()->getPrimaryKey(), $find);
+        if ($select) {
+            $this->setSelect($select);
+        }
+        return $this->firstOrFail($exception);
     }
 
     /**

@@ -530,6 +530,43 @@ foreach ($elements as $element) {
 > **Внимание:** метод toArray вернет так же зависимости привязок. Например `IBLOCK_ELEMENT_ID`. 
 > Для получения только значения `VALUE` используйте `$element->toArrayOnlyValues()`
 
+### Вспомогательные методы
+
+#### firstOrFail, findOfFail
+Поиск первого элемента. В случае ошибки нахождения выбрасывает исключение.
+```php
+$product = Catalog::query()
+    ->firstOrFail(
+        // Можно передать Throwable класс исключение, по умолчанию Bitrix\Main\ObjectNotFoundException::class
+        Bitrix\Main\ObjectNotFoundException::class
+    );
+$product = Catalog::query()
+    ->findOrFail(
+        $find, // Значение primary key (обычно id)
+        // Можно передать Throwable класс исключение, по умолчанию Bitrix\Main\ObjectNotFoundException::class
+        Bitrix\Main\ObjectNotFoundException::class,
+        $select
+    );
+```
+
+#### firstOrRedirect, findOrRedirect
+Поиск первого элемента. В случае ошибки производит редирект.
+```php
+$product = Catalog::query()
+    ->firstOrRedirect(
+        $url, // По умолчанию /404.php
+        $status, // Статус редиректа. По умолчанию 404 Not found
+    );
+$product = Catalog::query()
+    ->findOrRedirect(
+        $find, // Значение primary key (обычно id)
+        $url, // По умолчанию /404.php
+        $status, // Статус редиректа. По умолчанию 404 Not found
+        $select // Какие поля выбрать. По умолчанию все
+    );
+```
+
+
 ## Действия
 
 У моделей доступны быстрые действия.
